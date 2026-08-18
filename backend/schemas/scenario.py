@@ -3,7 +3,8 @@ Scenario-related Pydantic schemas.
 
 Phase 1: schema definitions + JSON file loading.
 Phase 2: predicted_miss_distance_km and time_to_closest_approach_s are
-         populated by the propagation engine; they are None here.
+         populated by the propagation engine; they are None here until
+         the /propagate endpoint is called.
 """
 from __future__ import annotations
 
@@ -21,8 +22,7 @@ class TLEData(BaseModel):
     Two-line element set.
 
     Phase 1 validates line length and line-number prefix.
-    Full SGP4 checksum validation is deferred to Phase 2 when sgp4 is first
-    exercised against these values.
+    Phase 2 validates that sgp4 can parse the lines (done in _build_satrec).
     """
 
     line1: str
@@ -79,8 +79,8 @@ class Scenario(BaseModel):
     A single two-object conjunction scenario.
 
     Scope: exactly our satellite + one threat object, LEO only.
-    predicted_miss_distance_km and time_to_closest_approach_s are None in
-    Phase 1 and populated by the propagation engine in Phase 2.
+    predicted_miss_distance_km and time_to_closest_approach_s are None until
+    the propagation engine populates them via the /propagate endpoint.
     """
 
     scenario_id: str = Field(..., min_length=1)
@@ -90,9 +90,11 @@ class Scenario(BaseModel):
     our_satellite: SpaceObject
     threat_object: SpaceObject
 
-    # Populated by propagation engine in Phase 2
+    # Populated by propagation engine (Phase 2+)
     predicted_miss_distance_km: float | None = None
     time_to_closest_approach_s: float | None = None
+    tca_utc: datetime | None = None
+    is_conjunction: bool | None = None
 
 
 class ScenarioListResponse(BaseModel):
@@ -100,3 +102,15 @@ class ScenarioListResponse(BaseModel):
 
     scenarios: list[Scenario]
     count: int
+
+
+# ── Propagation response ──────────────────────────────────────────────────────
+
+class PropagationResponse(BaseModel):
+    """Returned by POST /scenarios/{id}/propagate."""
+    scenario_id: str
+    miss_distance_km: float
+    tca_offset_seconds: float
+    tca_utc: datetime
+    is_conjunction: bool
+    conjunction_threshold_km: float

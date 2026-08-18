@@ -13,10 +13,12 @@ pydantic-settings>=2.3,<3.0
 pytest>=8.0,<9.0
 httpx>=0.27,<1.0          # TestClient transport for FastAPI
 
+# ── Propagation (Phase 2) ─────────────────────────────────────────────────────
+sgp4>=2.21,<3.0
+skyfield>=1.49,<2.0
+numpy>=1.26,<3.0
+
 # ─────────────────────────────────────────────────────────────────────────────
 # DEFERRED — do not install until the phase noted
-# sgp4>=2.21          Phase 2  TLE propagation
-# skyfield>=1.49      Phase 2  ephemeris / frame transforms
-# numpy>=1.26         Phase 2  orbital math arrays
 # ibm-watsonx-ai      Phase 3  Granite LLM via watsonx.ai
 # ─────────────────────────────────────────────────────────────────────────────

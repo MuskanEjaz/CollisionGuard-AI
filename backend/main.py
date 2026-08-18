@@ -14,6 +14,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from config import get_settings
 from routers import health as health_router
 from routers import scenarios as scenarios_router
+from routers import maneuvers as maneuvers_router
+from routers import robustness as robustness_router
 
 settings = get_settings()
 
@@ -34,10 +36,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[settings.cors_origin],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
 # ── Routers ───────────────────────────────────────────────────────────────────
 app.include_router(health_router.router)
 app.include_router(scenarios_router.router)
+app.include_router(maneuvers_router.router)
+app.include_router(robustness_router.router)

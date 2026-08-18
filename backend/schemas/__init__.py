@@ -6,6 +6,7 @@ from .scenario import (
     ScenarioType,
     Scenario,
     ScenarioListResponse,
+    PropagationResponse,
 )
 
 __all__ = [
@@ -16,4 +17,5 @@ __all__ = [
     "ScenarioType",
     "Scenario",
     "ScenarioListResponse",
+    "PropagationResponse",
 ]
