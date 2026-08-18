@@ -1,0 +1,28 @@
+{
+  "scenario_id": "SAFE-001",
+  "scenario_type": "safe",
+  "description": "LEO safe-pass scenario: our satellite and a tracked debris object pass at sufficient separation distance. No maneuver required.",
+  "epoch_utc": "2025-08-02T06:30:00Z",
+  "our_satellite": {
+    "object_id": "OUR_SAT_001",
+    "name": "CollisionGuard Demo Sat",
+    "tle": {
+      "line1": "1 99001U 25001A   25214.27083333  .00000100  00000-0  10000-4 0  9995",
+      "line2": "2 99001  51.6400 201.3800 0001500  90.0000 270.0000 15.49000000 00129"
+    },
+    "mass_kg": 450.0,
+    "cross_section_m2": 4.2
+  },
+  "threat_object": {
+    "object_id": "DEBRIS_002",
+    "name": "Tracked Debris Fragment DEB",
+    "tle": {
+      "line1": "1 99003U 18055C   25214.27083333  .00000050  00000-0  50000-5 0  9997",
+      "line2": "2 99003  53.0000 155.7200 0005000  45.0000 315.0000 15.22000000 00456"
+    },
+    "mass_kg": 8.5,
+    "cross_section_m2": 0.3
+  },
+  "predicted_miss_distance_km": null,
+  "time_to_closest_approach_s": null
+}

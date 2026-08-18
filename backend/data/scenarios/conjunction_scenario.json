@@ -1,0 +1,28 @@
+{
+  "scenario_id": "CONJ-001",
+  "scenario_type": "conjunction",
+  "description": "LEO conjunction scenario: our satellite and a decommissioned rocket body approach within 1 km threshold at TCA. Human operator review required.",
+  "epoch_utc": "2025-08-01T12:00:00Z",
+  "our_satellite": {
+    "object_id": "OUR_SAT_001",
+    "name": "CollisionGuard Demo Sat",
+    "tle": {
+      "line1": "1 99001U 25001A   25213.50000000  .00000100  00000-0  10000-4 0  9991",
+      "line2": "2 99001  51.6400 208.5100 0001500  90.0000 270.0000 15.49000000 00017"
+    },
+    "mass_kg": 450.0,
+    "cross_section_m2": 4.2
+  },
+  "threat_object": {
+    "object_id": "THREAT_001",
+    "name": "Derelict Rocket Body R/B",
+    "tle": {
+      "line1": "1 99002U 20043B   25213.50000000  .00000102  00000-0  10200-4 0  9993",
+      "line2": "2 99002  51.6410 208.5050 0001480  91.2000 268.8000 15.49012000 00023"
+    },
+    "mass_kg": 1200.0,
+    "cross_section_m2": 9.8
+  },
+  "predicted_miss_distance_km": null,
+  "time_to_closest_approach_s": null
+}
