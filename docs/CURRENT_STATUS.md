@@ -1,7 +1,7 @@
 # Current Status — CollisionGuard AI
 
-> Last updated: Phase 8 (documentation, CORS fix, team handoff)
-> This document reflects the repository state after Phase 8.
+> Last updated: Phase 8 verification run (CORS tests executed, fast tests re-run, README condensed)
+> This document reflects the repository state after Phase 8 verification.
 
 ---
 
@@ -9,7 +9,7 @@
 
 | Item | Evidence |
 |---|---|
-| FastAPI backend, all routes | 134 fast tests passed in this session (544.73 s) |
+| FastAPI backend, all routes | 140 fast tests passed in Phase 8 verification session (452.95 s) |
 | Pydantic v2 schemas | Validated by test suite and import checks |
 | SGP4 propagation (TEME frame) | 11 propagation tests passed |
 | Brent TCA search (24-hour, tol=0.01 s) | Tested in test_propagation.py |
@@ -19,9 +19,9 @@
 | In-memory TTL cache (SHA-256 key, 300 s) | 6 cache tests passed |
 | Human approval gate (two-step, server-side) | 10 approval/execution tests passed |
 | Simulated execution + incident report | 5 incident report tests passed |
-| React/Vite dark mission-control dashboard | npm run build succeeded (previous session) |
-| CORS DELETE fix applied to main.py | Code change verified; test_cors.py written |
-| README.md full rewrite (Phase 8) | File rewritten this session |
+| React/Vite dark mission-control dashboard | npm run build succeeded — 1m 16s, Plotly chunk warning only |
+| CORS DELETE fix applied to main.py | 6 CORS preflight tests executed: 6 passed in 1.51 s |
+| README.md condensed (Phase 8 verification) | 832 lines → 439 lines; all required content preserved |
 | docs/ directory created (Phase 8) | 10 documentation files created |
 
 ---
@@ -76,16 +76,16 @@ Neither of these tests may be labelled "passed" without actual execution.
 | Session | Count | Duration | Command |
 |---|---|---|---|
 | Pre-Phase 8 (verified) | 134 passed | 544.73 s | `pytest tests/ -v -m "not slow"` |
-| Post-Phase 8 (expected) | 140 passed | ~550 s | `pytest tests/ -v -m "not slow"` |
+| Phase 8 verification (executed) | **140 passed, 1 deselected** | **452.95 s** | `pytest tests/ -v -m "not slow"` |
 
-The 6 added CORS tests (`test_cors.py`) are expected to bring the total to 140.
+The 6 CORS tests (`test_cors.py`) are confirmed. Total is now 140 passed, 1 deselected.
 
 ---
 
 ## Frontend build status
 
-Previous session: `npm run build` succeeded with no errors.
-Known warning: Plotly bundle chunk size > 500 kB (expected for react-plotly.js prototype).
+Phase 8 verification session: `npm run build` succeeded in 1m 16s with no errors.
+Known warning: Plotly bundle chunk `index-DSSRmjNK.js` = 4,870.32 kB (expected for react-plotly.js prototype).
 
 ---
 
@@ -154,8 +154,7 @@ Script is in `docs/DEMO_VIDEO_PLAN.md`. Surya will record after:
 
 ### Competition-critical blockers (in order)
 
-1. **Surya**: Run `pytest tests/ -v -m "not slow"` — confirm 140 tests pass
-   (6 CORS tests newly added)
+1. ~~**Surya**: Run `pytest tests/ -v -m "not slow"` — **DONE**: 140 passed, 452.95 s~~
 2. **Surya**: Run `pytest tests/test_monte_carlo.py -v -m slow` — confirm
    `n_trials=1000`, take screenshot
 3. **Pushkar**: Obtain watsonx credentials, run smoke test, verify live Granite

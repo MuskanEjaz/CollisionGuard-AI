@@ -70,20 +70,15 @@ pytest tests/ -v -m "not slow"
 | `test_cors.py` | 6 | CORS OPTIONS preflight for DELETE, GET, POST |
 | **Total** | **140** | |
 
-### Verified result (Phase 8, after CORS fix)
+### Verified result (Phase 8 verification — actually executed)
 
 ```
-pytest tests/ -v -m "not slow"
-Expected: 140 passed
+================ 140 passed, 1 deselected in 452.95s (0:07:32) ================
 ```
 
-Pre-Phase 8 verified result (run in this session):
-```
-================ 134 passed, 1 deselected in 544.73s (0:09:04) ================
-```
-
-The 6 CORS preflight tests were added in Phase 8 and are expected to bring
-the total to 140.
+Platform: Python 3.12.7, pytest 8.4.2, win32.
+Prior session result (pre-CORS): `134 passed, 1 deselected in 544.73s`.
+The 6 CORS preflight tests bring the confirmed total to **140 passed**.
 
 ---
 
@@ -115,7 +110,7 @@ cd backend
 pytest tests/test_cors.py -v
 ```
 
-Expected: 6 passed.
+**Executed result (Phase 8 verification):** 6 passed in 1.51s.
 
 ---
 
@@ -234,6 +229,7 @@ smoke test output for the submission.
 ## Frontend tests
 
 No automated frontend tests (Vitest/React Testing Library) are implemented.
+No `test` script is present in `frontend/package.json`.
 
 Frontend validation is by build:
 ```powershell
@@ -241,8 +237,9 @@ cd frontend
 npm run build
 ```
 
-Expected: build completes with no errors. Known warning: Plotly chunk size
-exceeds 500 kB (expected for react-plotly.js; does not indicate an error).
+**Executed result (Phase 8 verification):** build succeeded in 1m 16s.
+Known warning: Plotly chunk `index-DSSRmjNK.js` = 4,870.32 kB / gzip 1,477.37 kB.
+This exceeds Vite's 500 kB advisory threshold — expected for react-plotly.js. Not an error.
 
 ---
 
@@ -292,9 +289,9 @@ npm run dev
 
 | Item | Who | Evidence type |
 |---|---|---|
-| 134+ fast tests pass | Surya | Terminal screenshot showing pytest output |
-| CORS preflight tests pass | Surya | Terminal screenshot with test_cors.py results |
-| Frontend builds | Muskan | Terminal screenshot of `npm run build` |
+| 140 fast tests pass | Surya | **DONE** — 140 passed, 452.95 s (Phase 8 verification) |
+| CORS preflight tests pass | Surya | **DONE** — 6 passed, 1.51 s (Phase 8 verification) |
+| Frontend builds | Muskan | **DONE** — succeeded 1m 16s (Phase 8 verification) |
 | Real 1,000-trial MC runs | Surya | Terminal screenshot with `n_trials=1000` in output |
 | Granite smoke test passes | Pushkar | Terminal screenshot showing `[PASS]` and model ID |
 | Live Granite advisory visible | Pushkar | Dashboard screenshot showing `source="granite"` badge |
