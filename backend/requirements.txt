@@ -18,7 +18,8 @@ sgp4>=2.21,<3.0
 skyfield>=1.49,<2.0
 numpy>=1.26,<3.0
 
-# ─────────────────────────────────────────────────────────────────────────────
-# DEFERRED — do not install until the phase noted
-# ibm-watsonx-ai      Phase 3  Granite LLM via watsonx.ai
-# ─────────────────────────────────────────────────────────────────────────────
+# ── Granite / watsonx.ai (Phase 6) ───────────────────────────────────────────
+# Range >=1.1,<2.0 is used because ibm-watsonx-ai 1.x has a stable public API
+# within the minor series. The verified installed version is 1.6.3.
+# To pin exactly: ibm-watsonx-ai==1.6.3
+ibm-watsonx-ai>=1.1,<2.0

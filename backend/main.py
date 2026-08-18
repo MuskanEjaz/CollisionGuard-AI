@@ -16,6 +16,8 @@ from routers import health as health_router
 from routers import scenarios as scenarios_router
 from routers import maneuvers as maneuvers_router
 from routers import robustness as robustness_router
+from routers import granite as granite_router
+from routers import analysis as analysis_router
 
 settings = get_settings()
 
@@ -45,3 +47,5 @@ app.include_router(health_router.router)
 app.include_router(scenarios_router.router)
 app.include_router(maneuvers_router.router)
 app.include_router(robustness_router.router)
+app.include_router(granite_router.router)
+app.include_router(analysis_router.router)

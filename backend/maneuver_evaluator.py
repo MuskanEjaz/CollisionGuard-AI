@@ -21,13 +21,11 @@ from __future__ import annotations
 
 import math
 import numpy as np
-from sgp4.api import Satrec, WGS84, jday
-from skyfield.api import load
-
+from sgp4.api import Satrec, WGS84, jday as _jday
 from schemas.scenario import Scenario
 from schemas.maneuver import ManeuverCandidate, ManeuverDirection
 from propagation import (
-    _build_satrec, _find_tca, _TS, CONJUNCTION_THRESHOLD_KM,
+    _build_satrec, _find_tca, CONJUNCTION_THRESHOLD_KM,
 )
 
 # Safety thresholds
@@ -261,9 +259,11 @@ def evaluate_candidate(
     epoch = scenario.epoch_utc
     if epoch.tzinfo is None:
         epoch = epoch.replace(tzinfo=timezone.utc)
-    t = _TS.from_datetime(epoch)
-    jd_whole = t.whole
-    jd_frac  = t.tt_fraction
+    second = epoch.second + epoch.microsecond / 1_000_000.0
+    jd_whole, jd_frac = _jday(
+        epoch.year, epoch.month, epoch.day,
+        epoch.hour, epoch.minute, second,
+    )
 
     sat_a_orig = _build_satrec(scenario.our_satellite.tle)
     sat_b      = _build_satrec(scenario.threat_object.tle)

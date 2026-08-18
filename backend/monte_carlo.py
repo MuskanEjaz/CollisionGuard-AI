@@ -28,8 +28,9 @@ from dataclasses import dataclass
 
 from schemas.scenario import Scenario
 from schemas.maneuver import ManeuverCandidate
+from sgp4.api import jday as _jday
 from maneuver_evaluator import (
-    _build_satrec, _apply_delta_v, _find_tca, _TS, SAFE_MISS_DISTANCE_KM
+    _build_satrec, _apply_delta_v, _find_tca, SAFE_MISS_DISTANCE_KM
 )
 
 # Monte Carlo parameters
@@ -81,9 +82,11 @@ def run_monte_carlo(
     epoch = scenario.epoch_utc
     if epoch.tzinfo is None:
         epoch = epoch.replace(tzinfo=timezone.utc)
-    t = _TS.from_datetime(epoch)
-    jd_whole = t.whole
-    jd_frac  = t.tt_fraction
+    second = epoch.second + epoch.microsecond / 1_000_000.0
+    jd_whole, jd_frac = _jday(
+        epoch.year, epoch.month, epoch.day,
+        epoch.hour, epoch.minute, second,
+    )
 
     sat_b = _build_satrec(scenario.threat_object.tle)   # threat -- not perturbed
     sat_a_nominal = _build_satrec(scenario.our_satellite.tle)

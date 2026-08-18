@@ -1,34 +1,25 @@
 /**
- * API client for the CollisionGuard AI backend.
- *
- * Base URL is read from the VITE_API_BASE_URL environment variable so that
- * the dev server, staging, and any future deployment targets can each use a
- * different URL without a code change.
- *
- * Usage:
- *   import { apiGet } from './api/client'
- *   const health = await apiGet('/health')
+ * API client -- Phase 7.
+ * All calls go through apiGet / apiPost; base URL from VITE_API_BASE_URL.
+ * Never hardcodes computed results. Never calls simulated execution "real".
  */
+const BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000'
-
-/**
- * Perform a GET request against the backend API.
- *
- * @param {string} path  - Endpoint path, e.g. '/health' or '/scenarios'
- * @returns {Promise<unknown>}  Parsed JSON response body
- * @throws {Error}  On non-2xx HTTP status or network failure
- */
-export async function apiGet(path) {
-  const url = `${BASE_URL}${path}`
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: { Accept: 'application/json' },
-  })
-
-  if (!response.ok) {
-    throw new Error(`API error ${response.status} on GET ${path}`)
+async function _request(method, path, body) {
+  const opts = {
+    method,
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
   }
-
-  return response.json()
+  if (body !== undefined) opts.body = JSON.stringify(body)
+  const r = await fetch(`${BASE}${path}`, opts)
+  if (!r.ok) {
+    let detail = `HTTP ${r.status}`
+    try { detail = (await r.json()).detail ?? detail } catch (_) {}
+    throw new Error(detail)
+  }
+  return r.json()
 }
+
+export const apiGet  = (path)        => _request('GET',    path)
+export const apiPost = (path, body)  => _request('POST',   path, body)
+export const apiDel  = (path)        => _request('DELETE', path)
