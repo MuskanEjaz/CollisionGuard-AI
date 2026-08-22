@@ -426,8 +426,8 @@ See [`docs/SAFETY_AND_RESPONSIBLE_USE.md`](docs/SAFETY_AND_RESPONSIBLE_USE.md).
 
 | Member | Role |
 |---|---|
-| **Muskan** | UI, final README, documentation and submission |
-| **Pushkar** | IBM Granite integration, live verification, grounded intelligence and AI evidence |
+| **Muskan Ejaz** | UI, final README, documentation and submission |
+| **Pushkar Malhotra** | IBM Granite integration, live verification, grounded intelligence and AI evidence |
 | **Suryansh sharma** | Backend safety, performance, real 1,000-trial Monte Carlo, demo video |
 
 See [`docs/TEAM_HANDOFF.md`](docs/TEAM_HANDOFF.md) for detailed task assignments and merge order.
