@@ -268,7 +268,7 @@ CollisionGuard AI/
     ├── TEAM_HANDOFF.md           Per-member task assignments and merge order
     ├── SUBMISSION_COPY.md        Draft submission text
     ├── CURRENT_STATUS.md         Detailed status of every item
-    └── DEMO_VIDEO_PLAN.md        3-minute script for Surya
+    └── DEMO_VIDEO_PLAN.md        3-minute script for Suryansh sharma
 ```
 
 ---
@@ -329,8 +329,8 @@ Frontend (`frontend/.env.local`, gitignored): `VITE_API_BASE_URL=http://localhos
 | Fast backend tests (140 tests) | **140 passed, 1 deselected** · 452.95 s | `pytest tests/ -v -m "not slow"` |
 | CORS preflight (6 tests) | **6 passed** · 1.51 s | `pytest tests/test_cors.py -v` |
 | Frontend build | **Succeeded** · 1m 16s · Plotly chunk warning (expected) | `npm run build` |
-| Real 1,000-trial Monte Carlo | **Not yet executed** — deferred; Surya owns | `pytest tests/test_monte_carlo.py -v -m slow` |
-| Live Granite smoke test | **Not yet verified** — requires real credentials; Pushkar owns | `python granite_smoke_test.py` |
+| Real 1,000-trial Monte Carlo | **Not yet executed** — deferred; Suryansh sharma owns | `pytest tests/test_monte_carlo.py -v -m slow` |
+| Live Granite smoke test | **Not yet verified** — requires real credentials; Pushkar Malhotra owns | `python granite_smoke_test.py` |
 
 See [`docs/TESTING.md`](docs/TESTING.md) for full procedures and evidence requirements.
 
@@ -367,9 +367,9 @@ and documentation. See [`docs/IBM_BOB_USAGE.md`](docs/IBM_BOB_USAGE.md).
 
 ## Demo video
 
-**[PLACEHOLDER — Surya will record and upload the final demo video]**
+**[PLACEHOLDER — Suryansh sharma will record and upload the final demo video]**
 
-Public video URL: `[TO BE FILLED BY SURYA]`  
+Public video URL: `[TO BE FILLED BY Suryansh sharma]`  
 Maximum duration: 3 minutes  
 See [`docs/DEMO_VIDEO_PLAN.md`](docs/DEMO_VIDEO_PLAN.md) for the full script.
 
@@ -428,7 +428,7 @@ See [`docs/SAFETY_AND_RESPONSIBLE_USE.md`](docs/SAFETY_AND_RESPONSIBLE_USE.md).
 |---|---|
 | **Muskan** | UI, final README, documentation and submission |
 | **Pushkar** | IBM Granite integration, live verification, grounded intelligence and AI evidence |
-| **Surya** | Backend safety, performance, real 1,000-trial Monte Carlo, demo video |
+| **Suryansh sharma** | Backend safety, performance, real 1,000-trial Monte Carlo, demo video |
 
 See [`docs/TEAM_HANDOFF.md`](docs/TEAM_HANDOFF.md) for detailed task assignments and merge order.
 
