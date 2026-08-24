@@ -385,16 +385,17 @@ def _call_granite(
     )
 
     prompt = _build_prompt(scenario_id, nominal_miss_km, safe_candidates)
-    response = model.generate_text(
-        prompt=prompt,
+    response = model.chat(
+        messages=[
+            {"role": "user", "content": prompt}
+        ],
         params={
-            "max_new_tokens": 800,
-            "temperature": 0.0,    # deterministic output for reproducibility
-            "stop_sequences": [],
+            "max_tokens": 800,
+            "temperature": 0.0,
         },
     )
-
-    raw_text = response if isinstance(response, str) else str(response)
+    
+    raw_text = response["choices"][0]["message"]["content"]
     parsed = _parse_granite_response(raw_text, scenario_id, safe_candidates,
                                      model_id=model_id)
     if parsed is None:
