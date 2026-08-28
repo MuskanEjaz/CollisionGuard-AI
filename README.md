@@ -314,7 +314,7 @@ CollisionGuard AI/
     ├── TEAM_HANDOFF.md           Per-member task assignments and merge order
     ├── SUBMISSION_COPY.md        Draft submission text
     ├── CURRENT_STATUS.md         Detailed status of every item
-    └── DEMO_VIDEO_PLAN.md        3-minute script for Surya
+    └── DEMO_VIDEO_PLAN.md        3-minute script for Suryansh sharma
 ```
 
 ---
@@ -413,9 +413,9 @@ and documentation. See [`docs/IBM_BOB_USAGE.md`](docs/IBM_BOB_USAGE.md).
 
 ## Demo video
 
-**[PLACEHOLDER — Surya will record and upload the final demo video]**
+**[PLACEHOLDER — Suryansh sharma will record and upload the final demo video]**
 
-Public video URL: `[TO BE FILLED BY SURYA]`  
+Public video URL: `[TO BE FILLED BY Suryansh sharma]`  
 Maximum duration: 3 minutes  
 See [`docs/DEMO_VIDEO_PLAN.md`](docs/DEMO_VIDEO_PLAN.md) for the full script.
 
@@ -472,9 +472,9 @@ See [`docs/SAFETY_AND_RESPONSIBLE_USE.md`](docs/SAFETY_AND_RESPONSIBLE_USE.md).
 
 | Member | Role |
 |---|---|
-| **Muskan** | UI, final README, documentation and submission |
-| **Pushkar** | IBM Granite integration, live verification, grounded intelligence and AI evidence |
-| **Surya** | Backend safety, performance, real 1,000-trial Monte Carlo, demo video |
+| **Muskan Ejaz** | UI, final README, documentation and submission |
+| **Pushkar Malhotra** | IBM Granite integration, live verification, grounded intelligence and AI evidence |
+| **Suryansh sharma** | Backend safety, performance, real 1,000-trial Monte Carlo, demo video |
 
 See [`docs/TEAM_HANDOFF.md`](docs/TEAM_HANDOFF.md) for detailed task assignments and merge order.
 
