@@ -14,7 +14,7 @@
 | SGP4 propagation (TEME frame) | 11 propagation tests passed |
 | Brent TCA search (24-hour, tol=0.01 s) | Tested in test_propagation.py |
 | Maneuver safety evaluation (5 candidates) | 13 evaluator tests passed |
-| Granite numeric grounding guardrail | 42 Granite tests passed (mocked) |
+| Granite numeric grounding guardrail | 42 Granite tests passed; live Granite verified in dashboard |
 | Deterministic fallback ranking | Tested in test_granite.py |
 | In-memory TTL cache (SHA-256 key, 300 s) | 6 cache tests passed |
 | Human approval gate (two-step, server-side) | 10 approval/execution tests passed |
@@ -26,18 +26,41 @@
 
 ---
 
-## Completed with mocked tests only
+## Completed with mocked tests
 
 | Item | Status |
 |---|---|
-| IBM Granite live API call | Implemented; tested with mocked responses only |
+| IBM Granite live API call | 42 automated tests use mocked responses; live API separately verified |
 | Granite prompt construction | Implemented; never sent to real Granite in tests |
 | Granite response parsing | Implemented and unit-tested with synthetic JSON |
 | Granite incident report generation | Implemented; mocked in tests |
 | Granite numeric conflict detection | Implemented; tested with synthetic discrepancies |
 
-All Granite tests pass with mocked responses. **No live watsonx response has
-been confirmed in this repository.** Live verification is Pushkar's task.
+All 42 Granite automated tests pass. These tests use mocked/synthetic
+responses for deterministic coverage. Live watsonx verification is documented
+separately below.
+
+---
+
+## Granite live verification
+
+| Item | Evidence |
+|---|---|
+| IBM Granite live API call | Live watsonx.ai call succeeded with `ibm/granite-4-h-small` |
+| Granite prompt construction | Live Granite call verified through dashboard |
+| Granite response parsing | Live response successfully parsed |
+| Granite incident report generation | Live Granite advisory and incident report verified |
+| Granite numeric grounding | Backend physics values remain authoritative; live dashboard verified |
+| Human approval / simulated execution | Verified end-to-end with live Granite advisory |
+
+Live Granite model: `ibm/granite-4-h-small`
+
+Live verification also confirmed:
+- Granite is labelled as live in the dashboard.
+- Granite ranks only backend-validated safe candidates.
+- Backend-computed physics values remain authoritative.
+- Granite cannot approve execution or override safety decisions.
+- Incident report records the advisory source as `granite`.
 
 ---
 
@@ -46,9 +69,8 @@ been confirmed in this repository.** Live verification is Pushkar's task.
 | Item | Command to run | Notes |
 |---|---|---|
 | Real 1,000-trial Monte Carlo | `pytest tests/test_monte_carlo.py -v -m slow` | ~8 min; must run before submission |
-| Live Granite smoke test | `python granite_smoke_test.py` | Requires .env with real credentials |
 
-Neither of these tests may be labelled "passed" without actual execution.
+The remaining deferred test may not be labelled "passed" without actual execution.
 
 ---
 
@@ -102,10 +124,24 @@ Preflight test added: `tests/test_cors.py` (6 tests).
 
 ## Live Granite status
 
-**Not verified.**
+**Verified.**
 
-The Granite integration is implemented and thoroughly mocked-tested. No live
-watsonx.ai response has been confirmed. Pushkar owns this verification task.
+Pushkar completed live watsonx.ai verification using
+`ibm/granite-4-h-small`.
+
+The live smoke test succeeded, and the model was verified in the
+CollisionGuard dashboard. Granite successfully generated the advisory,
+ranking safe maneuver candidates while the backend remained authoritative
+for all physics values.
+
+The human approval gate and simulated execution flow were also verified
+with the live Granite advisory.
+
+Evidence:
+- Live Granite smoke test passed
+- 42 Granite tests passed
+- Live dashboard showed `IBM Granite — Live`
+- Incident report recorded `generated_by: granite`
 
 ---
 
@@ -124,7 +160,7 @@ Surya owns this execution task.
 **Completed in Phase 8.**
 
 - `README.md` — full rewrite; reflects Phase 1–8 system; all 14 endpoints listed;
-  correct env var names; WATSONX_APIKEY (no underscore); live Granite marked unverified;
+  correct env var names; WATSONX_APIKEY (no underscore); live Granite verified with `ibm/granite-4-h-small`;
   slow test marked deferred
 - `docs/ARCHITECTURE.md` — complete
 - `docs/API_REFERENCE.md` — complete; all 14 endpoints; planned routes in separate section
@@ -157,8 +193,8 @@ Script is in `docs/DEMO_VIDEO_PLAN.md`. Surya will record after:
 1. ~~**Surya**: Run `pytest tests/ -v -m "not slow"` — **DONE**: 140 passed, 452.95 s~~
 2. **Surya**: Run `pytest tests/test_monte_carlo.py -v -m slow` — confirm
    `n_trials=1000`, take screenshot
-3. **Pushkar**: Obtain watsonx credentials, run smoke test, verify live Granite
-   in dashboard, provide evidence screenshots
+3. ~~**Pushkar**: Obtain watsonx credentials, run smoke test, verify live Granite
+   in dashboard, provide evidence screenshots~~ — **DONE**
 4. **Muskan**: Verify UI end-to-end with both scenarios, confirm all cards render,
    take evidence screenshots
 5. **Surya**: Record demo video against final merged build, upload publicly

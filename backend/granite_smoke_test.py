@@ -82,10 +82,16 @@ try:
         credentials=creds,
         project_id=s.watsonx_project_id,
     )
-    response = model.generate_text(
-        prompt=MINIMAL_PROMPT,
-        params={"max_new_tokens": 60, "temperature": 0.0},
+    response = model.chat(
+        messages=[
+            {"role": "user", "content": MINIMAL_PROMPT}
+        ],
+        params={
+            "max_tokens": 60,
+            "temperature": 0.0,
+        },
     )
+
 except Exception as exc:
     latency = time.perf_counter() - t0
     err_type = type(exc).__name__
@@ -109,7 +115,7 @@ except Exception as exc:
     sys.exit(9)
 
 latency = time.perf_counter() - t0
-raw_text = response if isinstance(response, str) else str(response)
+raw_text = response["choices"][0]["message"]["content"]
 print(f"[INFO] Response received in {latency:.2f}s")
 print(f"[INFO] Raw response (first 200 chars): {raw_text[:200]!r}")
 
