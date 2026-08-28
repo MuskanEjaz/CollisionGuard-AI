@@ -8,29 +8,41 @@
 
 ## One-line pitch
 
-A mission-control interface that gives a human satellite operator a clear
-physics-grounded decision within seconds of a predicted conjunction alert —
-backed by IBM Granite for advisory ranking and a hard deterministic safety gate
-that Granite cannot override.
+A mission-control interface that gives a human satellite operator a physics-grounded
+conjunction decision within seconds — backed by IBM Granite for advisory ranking and
+a hard deterministic safety gate that Granite cannot override.
+
+---
+
+## Responsible-use disclaimer
+
+> CollisionGuard AI must not be used for real spacecraft command, operational
+> conjunction screening, or any safety-critical decision.
+> All results are screening-level estimates from synthetic data.
+> **This is a prototype demonstration only.**
 
 ---
 
 ## Challenge
 
-IBM AI Builders Challenge — August 2026  
+IBM AI Builders Challenge — August 2026
 Theme: **Advance Space Exploration with AI**
 
 ---
 
-## Badges
+## Project snapshot
 
-![Python](https://img.shields.io/badge/Python-3.12-blue)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688)
-![React](https://img.shields.io/badge/React-18-61dafb)
-![Vite](https://img.shields.io/badge/Vite-5-646cff)
-![IBM Granite](https://img.shields.io/badge/IBM%20Granite-watsonx.ai-0f62fe)
-![Simulation](https://img.shields.io/badge/Status-Simulation%20Only-yellow)
-![Tests](https://img.shields.io/badge/Fast%20Tests-140%20passed-brightgreen)
+| Item | Value |
+|---|---|
+| Backend | FastAPI + uvicorn, Python 3.12 |
+| Frontend | React 18 + Vite 5 + Plotly |
+| Physics engine | SGP4 (sgp4 library), TEME frame |
+| TCA search | Coarse 30-s grid + Brent refinement (tol = 0.01 s) |
+| AI advisory | IBM Granite via watsonx.ai (deterministic fallback included) |
+| Safety model | Deterministic safety gate; Granite cannot override; human approval required |
+| Test suite | 140 fast tests passing; 1 slow test deferred |
+| Build status | Production build verified (Plotly chunk warning expected) |
+| Live Granite | Not verified in this repository — Pushkar owns |
 
 ---
 
@@ -105,6 +117,40 @@ Backend executes simulation: delta-v applied, fuel consumed, post-maneuver miss 
     |
     v
 Incident report generated (Granite narrative or deterministic template)
+```
+
+---
+
+## Screenshot gallery
+
+> Screenshots will be added by Muskan after running the application end-to-end.
+> Files are stored in `docs/images/` (repository) and
+> `C:\Users\FINE LAPTOP\Documents\August Challenge\Evidence\screenshots\` (full evidence set).
+
+| # | Screenshot | Status |
+|---|---|---|
+| 01 | Dashboard overview | Pending — Muskan |
+| 02 | Conjunction scenario loaded | Pending — Muskan |
+| 03 | Trajectory closest approach | Pending — Muskan |
+| 04 | Risk evidence panel | Pending — Muskan |
+| 05 | Maneuver candidates comparison | Pending — Muskan |
+| 06 | Granite or fallback advisory | Pending — Muskan |
+| 07 | Human approval confirmation | Pending — Muskan |
+| 08 | Simulated execution | Pending — Muskan |
+| 09 | Post-maneuver verification | Pending — Muskan |
+| 10 | Incident report | Pending — Muskan |
+| 11 | Safe scenario | Pending — Muskan |
+| 12 | Responsive mobile view | Pending — Muskan |
+| 13 | Backend fast tests | Pending — Muskan |
+| 14 | Frontend production build | Pending — Muskan |
+| 15 | CORS preflight tests | Pending — Muskan |
+| 16 | Live Granite smoke test | **Pending — Pushkar** (requires real credentials) |
+| 17 | Real 1,000-trial test | **Pending — Surya** (requires slow test run) |
+
+Once screenshots are placed in `docs/images/`, update links using this pattern:
+
+```markdown
+![CollisionGuard AI dashboard](docs/images/01_dashboard_overview.png)
 ```
 
 ---
@@ -326,11 +372,11 @@ Frontend (`frontend/.env.local`, gitignored): `VITE_API_BASE_URL=http://localhos
 
 | Test suite | Status | Command |
 |---|---|---|
-| Fast backend tests (140 tests) | **140 passed, 1 deselected** · 452.95 s | `pytest tests/ -v -m "not slow"` |
-| CORS preflight (6 tests) | **6 passed** · 1.51 s | `pytest tests/test_cors.py -v` |
-| Frontend build | **Succeeded** · 1m 16s · Plotly chunk warning (expected) | `npm run build` |
-| Real 1,000-trial Monte Carlo | **Not yet executed** — deferred; Suryansh sharma owns | `pytest tests/test_monte_carlo.py -v -m slow` |
-| Live Granite smoke test | **Not yet verified** — requires real credentials; Pushkar Malhotra owns | `python granite_smoke_test.py` |
+| Fast backend tests (140 tests) | **140 passed, 1 deselected** · 1120.50 s | `pytest tests/ -v -m "not slow"` |
+| CORS preflight (6 tests) | **6 passed** · 8.37 s | `pytest tests/test_cors.py -v` |
+| Frontend build | **Succeeded** · 2m 9s · Plotly chunk warning (expected) | `npm run build` |
+| Real 1,000-trial Monte Carlo | **Not yet executed** — deferred; Surya owns | `pytest tests/test_monte_carlo.py -v -m slow` |
+| Live Granite smoke test | **Not yet verified** — requires real credentials; Pushkar owns | `python granite_smoke_test.py` |
 
 See [`docs/TESTING.md`](docs/TESTING.md) for full procedures and evidence requirements.
 
