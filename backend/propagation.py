@@ -15,6 +15,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Optional
 
 import numpy as np
 from sgp4.api import Satrec, WGS84, jday  # type: ignore[import-untyped]
@@ -27,6 +28,11 @@ from schemas.scenario import Scenario, TLEData
 _SEARCH_WINDOW_SECONDS = 86_400        # 24-hour look-ahead
 _COARSE_STEP_SECONDS   = 30            # coarse grid step
 _REFINE_TOLERANCE_SECONDS = 0.01       # Brent convergence tolerance
+
+# ── Visualization parameters ──────────────────────────────────────────────────
+# Number of samples for trajectory visualization, bounded for performance
+_VIZ_SAMPLE_COUNT = 360                # ~180-360 samples covering useful window around TCA
+_VIZ_WINDOW_SECONDS = 10800            # ±3 hours around TCA (total 6 hours)
 
 
 # ── Frame conversion ──────────────────────────────────────────────────────────
@@ -213,15 +219,150 @@ class PropagationResult:
     miss_distance_km: float
     tca_utc: datetime                  # UTC datetime of TCA
     is_conjunction: bool               # True if miss_distance_km < CONJUNCTION_THRESHOLD_KM
+    # Relative velocity at TCA — deterministic, same-frame, same-timestamp
+    # Units: km/s (SGP4 native output).  None if SGP4 failed at TCA.
+    relative_velocity_km_s: float | None = None
+    relative_velocity_vector_km_s: tuple[float, float, float] | None = None
+    relative_velocity_frame: str = "TEME"
+    relative_velocity_basis: str = (
+        "Difference of both SGP4 velocity vectors at TCA in the TEME frame"
+    )
+    # Visualization data — sampled trajectory positions
+    visualization_samples: Optional[list] = None
+    visualization_tca: Optional[dict] = None
+    visualization_frame: str = "TEME"
+    visualization_units: str = "km"
+
+
+@dataclass
+class VisualizationSample:
+    """Single sample point for trajectory visualization."""
+    timestamp_utc: datetime
+    protected_position_km: tuple[float, float, float]
+    threat_position_km: tuple[float, float, float]
+
+
+def _generate_visualization_samples(
+    sat_a: Satrec,
+    sat_b: Satrec,
+    jd_start_whole: float,
+    jd_start_frac: float,
+    tca_offset_seconds: float,
+    tca_utc: datetime,
+    miss_distance_km: float,
+    relative_velocity_km_s: Optional[float],
+    relative_velocity_vector_km_s: Optional[tuple],
+) -> tuple[list, dict]:
+    """
+    Generate bounded trajectory samples for visualization.
+
+    Returns (samples, tca_info) where:
+    - samples: list of VisualizationSample objects with aligned timestamps
+    - tca_info: dict with TCA details including both object positions
+    """
+    # Window: ±_VIZ_WINDOW_SECONDS/2 around TCA
+    window_start = tca_offset_seconds - _VIZ_WINDOW_SECONDS / 2
+    window_end = tca_offset_seconds + _VIZ_WINDOW_SECONDS / 2
+
+    # Ensure window is within search bounds
+    window_start = max(0, window_start)
+    window_end = min(_SEARCH_WINDOW_SECONDS, window_end)
+
+    # Generate evenly spaced timestamps
+    offsets = np.linspace(window_start, window_end, _VIZ_SAMPLE_COUNT)
+
+    samples = []
+    for offset_s in offsets:
+        jd_whole = jd_start_whole
+        jd_frac = jd_start_frac + offset_s / 86_400.0
+
+        pos_a = _propagate_single(sat_a, jd_whole, jd_frac)
+        pos_b = _propagate_single(sat_b, jd_whole, jd_frac)
+
+        if np.any(np.isnan(pos_a)) or np.any(np.isnan(pos_b)):
+            continue
+
+        # Convert offset to UTC timestamp
+        sample_utc = datetime.fromtimestamp(
+            tca_utc.timestamp() - tca_offset_seconds + offset_s,
+            tz=timezone.utc
+        )
+
+        samples.append(VisualizationSample(
+            timestamp_utc=sample_utc,
+            protected_position_km=(float(pos_a[0]), float(pos_a[1]), float(pos_a[2])),
+            threat_position_km=(float(pos_b[0]), float(pos_b[1]), float(pos_b[2])),
+        ))
+
+    # TCA positions - propagate both to exact TCA
+    tca_jd_frac = jd_start_frac + tca_offset_seconds / 86_400.0
+    e_a, pos_a_tca, vel_a = sat_a.sgp4(jd_start_whole, tca_jd_frac)
+    e_b, pos_b_tca, vel_b = sat_b.sgp4(jd_start_whole, tca_jd_frac)
+
+    if e_a == 0 and e_b == 0:
+        tca_info = {
+            "timestamp_utc": tca_utc.isoformat(),
+            "protected_position_km": [float(pos_a_tca[0]), float(pos_a_tca[1]), float(pos_a_tca[2])],
+            "threat_position_km": [float(pos_b_tca[0]), float(pos_b_tca[1]), float(pos_b_tca[2])],
+            "miss_distance_km": miss_distance_km,
+            "relative_velocity_km_s": relative_velocity_km_s,
+            "relative_velocity_vector_km_s": relative_velocity_vector_km_s,
+            "coordinate_frame": "TEME",
+        }
+    else:
+        # Fallback if SGP4 fails at TCA
+        tca_info = {
+            "timestamp_utc": tca_utc.isoformat(),
+            "protected_position_km": [0.0, 0.0, 0.0],
+            "threat_position_km": [0.0, 0.0, 0.0],
+            "miss_distance_km": miss_distance_km,
+            "relative_velocity_km_s": relative_velocity_km_s,
+            "relative_velocity_vector_km_s": relative_velocity_vector_km_s,
+            "coordinate_frame": "TEME",
+        }
+
+    return samples, tca_info
 
 
 CONJUNCTION_THRESHOLD_KM = 1.0        # business rule: miss distance < 1 km is a conjunction
+
+
+def _relative_velocity_at_tca(
+    sat_a: "Satrec",
+    sat_b: "Satrec",
+    jd_whole: float,
+    jd_frac: float,
+    tca_offset_s: float,
+) -> "tuple[float | None, tuple[float, float, float] | None]":
+    """
+    Propagate both objects to the exact TCA timestamp and compute:
+        rel_vec  = vel_b - vel_a      (threat minus protected, TEME km/s)
+        rel_speed = ||rel_vec||
+
+    Returns (rel_speed_km_s, (vx, vy, vz)) or (None, None) on SGP4 error.
+
+    Convention: threat velocity minus protected velocity.
+    The Euclidean norm is sign-independent.
+    Both state vectors use the identical Julian date (same coordinate frame,
+    same instant) as required for a valid relative-velocity calculation.
+    """
+    tca_jd_frac = jd_frac + tca_offset_s / 86_400.0
+    e_a, pos_a, vel_a = sat_a.sgp4(jd_whole, tca_jd_frac)
+    e_b, pos_b, vel_b = sat_b.sgp4(jd_whole, tca_jd_frac)
+    if e_a != 0 or e_b != 0:
+        return None, None
+    va = np.array(vel_a, dtype=float)  # km/s
+    vb = np.array(vel_b, dtype=float)  # km/s
+    dv = vb - va                        # threat – protected
+    speed = float(np.linalg.norm(dv))
+    return round(speed, 6), (round(dv[0], 6), round(dv[1], 6), round(dv[2], 6))
 
 
 def propagate_scenario(scenario: Scenario) -> PropagationResult:
     """
     Propagate both objects in scenario and return TCA + miss distance.
 
+    Also computes relative velocity at TCA from the same SGP4 state vectors.
     Raises ValueError on sgp4 parse errors.
     """
     sat_a = _build_satrec(scenario.our_satellite.tle)
@@ -253,12 +394,27 @@ def propagate_scenario(scenario: Scenario) -> PropagationResult:
     if not math.isfinite(miss_dist):
         raise ValueError("SGP4 could not produce a valid state in the search window")
 
+    # Relative velocity at TCA — same timestamp, same TEME frame as miss distance
+    rel_speed, rel_vec = _relative_velocity_at_tca(
+        sat_a, sat_b, jd_whole, jd_frac, tca_offset
+    )
+
+    # Generate visualization samples
+    viz_samples, viz_tca = _generate_visualization_samples(
+        sat_a, sat_b, jd_whole, jd_frac, tca_offset, tca_utc,
+        miss_dist, rel_speed, rel_vec
+    )
+
     return PropagationResult(
         scenario_id=scenario.scenario_id,
         tca_offset_seconds=round(tca_offset, 2),
         miss_distance_km=round(miss_dist, 4),
         tca_utc=tca_utc,
         is_conjunction=miss_dist < CONJUNCTION_THRESHOLD_KM,
+        relative_velocity_km_s=rel_speed,
+        relative_velocity_vector_km_s=rel_vec,
+        visualization_samples=viz_samples,
+        visualization_tca=viz_tca,
     )
 
 

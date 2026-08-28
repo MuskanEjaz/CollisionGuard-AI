@@ -1,68 +1,49 @@
 /**
- * CollisionGuard AI — Mission-Control Dashboard
+ * CollisionGuard AI — Mission-Console Dashboard
  *
- * Human-supervised decision-support prototype.
- * Simulation only — not flight software.
+ * Layout: sticky command-bar + stepper → split workspace (viz left, risk right)
+ * → lower sections (maneuvers, advisory, approval)
  *
- * UI flow:
- *   1. Select scenario           → step: analyse
- *   2. Run analysis              → step: review
- *   3. Review metrics + maneuvers → step: approve
- *   4. Approve → Confirm         → step: simulate
- *   5. Simulated execution       → step: verify
- *   6. Verification + report     → step: report
- *
- * Scientific rules:
- *   - Every displayed number comes from an actual backend response.
- *   - "Not provided" is shown for any unavailable field.
- *   - Granite output is clearly labelled and separated from physics values.
- *   - Unsafe candidates cannot be selected or approved.
- *   - Simulated execution cannot occur without explicit human approval.
+ * Human-supervised decision-support prototype. Simulation only — not flight software.
+ * All displayed values come from actual backend API responses.
  */
 import { useState, useCallback, useEffect, useRef } from 'react'
 import { apiGet, apiPost, apiDel } from './api/client'
+import TrajectoryPlot      from './components/TrajectoryPlot'
 import ConjunctionMetrics  from './components/ConjunctionMetrics'
 import ManeuverTable       from './components/ManeuverTable'
 import GraniteAdvisory     from './components/GraniteAdvisory'
 import ApprovalGate        from './components/ApprovalGate'
-import TrajectoryPlot      from './components/TrajectoryPlot'
+import LiveCelestrakPanel  from './components/LiveCelestrakPanel'
 import './styles.css'
 
-// ─────────────────────────────────────────────────────────────
-// WORKFLOW STEPS
-// ─────────────────────────────────────────────────────────────
+// ─── STEPS ───────────────────────────────────────────────────────
 const STEPS = [
-  { id: 'analyse',  label: 'Analyse' },
-  { id: 'review',   label: 'Review'  },
-  { id: 'approve',  label: 'Approve' },
-  { id: 'simulate', label: 'Simulate'},
-  { id: 'verify',   label: 'Verify'  },
-  { id: 'report',   label: 'Report'  },
+  { id: 'analyse',  label: 'Analyse'  },
+  { id: 'review',   label: 'Review'   },
+  { id: 'approve',  label: 'Approve'  },
+  { id: 'simulate', label: 'Simulate' },
+  { id: 'verify',   label: 'Verify'   },
+  { id: 'report',   label: 'Report'   },
 ]
 
-function WorkflowStepper({ currentStep, completedSteps }) {
+function Stepper({ currentStep, completedSteps }) {
   return (
-    <nav
-      className="workflow-stepper"
-      aria-label="Decision workflow steps"
-      role="list"
-    >
-      {STEPS.map((step, idx) => {
-        const done   = completedSteps.includes(step.id)
-        const active = currentStep === step.id
+    <nav className="stepper" aria-label="Decision workflow" role="list">
+      {STEPS.map((s, i) => {
+        const done   = completedSteps.includes(s.id)
+        const active = currentStep === s.id
         const state  = done ? 'done' : active ? 'active' : 'waiting'
         return (
-          <div key={step.id} style={{ display: 'contents' }} role="listitem">
+          <div key={s.id} style={{ display: 'contents' }} role="listitem">
             <div className="step" aria-current={active ? 'step' : undefined}>
-              <div
-                className={`step-circle ${state}`}
-                aria-label={`${step.label}: ${done ? 'complete' : active ? 'current' : 'pending'}`}
-              >
-                {done ? '✓' : idx + 1}
+              <div className={`step-node ${state}`}
+                   aria-label={`${s.label}: ${done ? 'complete' : active ? 'current' : 'pending'}`}>
+                {done ? '✓' : i + 1}
               </div>
-              <span className={`step-label ${state}`}>{step.label}</span>
+              <span className={`step-lbl ${state}`}>{s.label}</span>
             </div>
-            {idx < STEPS.length - 1 && (
+            {i < STEPS.length - 1 && (
               <div className={`step-connector ${done ? 'done' : ''}`} aria-hidden="true" />
             )}
           </div>
@@ -72,83 +53,66 @@ function WorkflowStepper({ currentStep, completedSteps }) {
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// HEALTH STATUS (top bar)
-// ─────────────────────────────────────────────────────────────
+// ─── HEALTH PILL ─────────────────────────────────────────────────
 function HealthPill() {
   const [health, setHealth] = useState(null)
-  const [err, setErr]       = useState(false)
-
+  const [err,    setErr]    = useState(false)
   useEffect(() => {
-    apiGet('/health')
-      .then(d => setHealth(d))
-      .catch(() => setErr(true))
+    apiGet('/health').then(setHealth).catch(() => setErr(true))
   }, [])
-
-  const status = health?.status ?? (err ? 'error' : 'checking')
-  const dotCls = err ? 'error' : (health?.status === 'ok' ? 'ok' : health?.status === 'degraded' ? 'degraded' : '')
-  const label  = err ? 'Backend unreachable' : health ? `API ${health.status} · v${health.version}` : 'Checking API…'
-
+  const dotCls = err ? 'error' : health?.status === 'ok' ? 'ok' : health ? 'degraded' : ''
+  const label  = err
+    ? 'Backend unreachable'
+    : health ? `API ${health.status} · v${health.version}` : 'Checking…'
   return (
-    <div className="app-health-pill" aria-label={`Backend status: ${label}`}>
+    <div className="health-pill" aria-label={`Backend status: ${label}`}>
       <span className={`health-dot ${dotCls}`} aria-hidden="true" />
       <span>{label}</span>
     </div>
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// SCENARIO SELECTOR
-// ─────────────────────────────────────────────────────────────
+// ─── SCENARIO BUTTONS ────────────────────────────────────────────
 const SCENARIO_META = {
-  conjunction_scenario: {
-    source: 'Synthetic TLE (committed fallback)',
-    quality: 'Screening-level estimate',
-  },
-  safe_scenario: {
-    source: 'Synthetic TLE (committed fallback)',
-    quality: 'Screening-level estimate',
-  },
+  conjunction_scenario: { source: 'Synthetic TLE', quality: 'Screening-level' },
+  safe_scenario:        { source: 'Synthetic TLE', quality: 'Screening-level' },
 }
 
-function ScenarioSelector({ scenarios, selectedId, onSelect, disabled }) {
+function ScenarioGrid({ scenarios, selectedId, onSelect, disabled }) {
   if (!scenarios.length) return null
   return (
-    <div className="scenario-grid" role="radiogroup" aria-label="Select a scenario">
+    <div className="scenario-grid" role="radiogroup" aria-label="Select scenario">
       {scenarios.map(s => {
-        const isConj  = s.scenario_type === 'conjunction'
-        const meta    = SCENARIO_META[s.scenario_id] ?? {}
+        const conj    = s.scenario_type === 'conjunction'
         const checked = selectedId === s.scenario_id
+        const meta    = SCENARIO_META[s.scenario_id] ?? {}
         return (
           <button
             key={s.scenario_id}
             role="radio"
             aria-checked={checked}
-            className={`scenario-btn ${checked ? (isConj ? 'active-conj' : 'active-safe') : ''}`}
+            className={`scenario-btn ${checked ? (conj ? 'active-conj' : 'active-safe') : ''}`}
             onClick={() => onSelect(s.scenario_id)}
             disabled={disabled}
           >
-            <div
-              className="sb-type"
-              style={{ color: isConj ? 'var(--red)' : 'var(--green)' }}
-            >
-              {isConj ? '⚠ Critical Conjunction' : '✓ Safe Pass'}
+            <div className="sb-type" style={{ color: conj ? 'var(--red)' : 'var(--green-hi)' }}>
+              {conj ? '⚠ Critical Conjunction' : '✓ Safe Pass'}
             </div>
             <div className="sb-id">{s.scenario_id}</div>
             <div className="sb-desc">{s.description}</div>
             <div className="sb-meta">
               <div className="sb-meta-row">
-                <span>Data source</span>
+                <span>Source</span>
                 <span>{meta.source ?? 'Not provided'}</span>
               </div>
               <div className="sb-meta-row">
-                <span>Data quality</span>
+                <span>Quality</span>
                 <span>{meta.quality ?? 'Not provided'}</span>
               </div>
               {s.epoch_utc && (
                 <div className="sb-meta-row">
-                  <span>Epoch (UTC)</span>
-                  <span>{s.epoch_utc}</span>
+                  <span>Epoch</span>
+                  <span style={{ fontFamily: 'var(--mono)' }}>{s.epoch_utc}</span>
                 </div>
               )}
             </div>
@@ -159,15 +123,13 @@ function ScenarioSelector({ scenarios, selectedId, onSelect, disabled }) {
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// DATA QUALITY PANEL
-// ─────────────────────────────────────────────────────────────
-function DataQualityPanel({ quality }) {
+// ─── DATA QUALITY ─────────────────────────────────────────────────
+function DataQuality({ quality }) {
   if (!quality?.length) return null
   return (
     <ul className="dq-list" aria-label="Data quality notes">
       {quality.map((q, i) => (
-        <li key={i}>
+        <li key={i} className="dq-item">
           <span className="dq-field">{q.field}</span>
           <span>{q.note}</span>
         </li>
@@ -176,34 +138,34 @@ function DataQualityPanel({ quality }) {
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// MAIN APP
-// ─────────────────────────────────────────────────────────────
+// ─── MAIN APP ────────────────────────────────────────────────────
+// ─── SCENARIO MODE ───────────────────────────────────────────────
+// 'synthetic' = committed JSON scenarios; 'live' = live CelesTrak fetch
+const SCENARIO_MODES = [
+  { id: 'synthetic', label: 'Synthetic Demo'   },
+  { id: 'live',      label: '● Live CelesTrak' },
+]
+
 export default function App() {
-  const [scenarios,     setScenarios]     = useState([])
-  const [scenariosErr,  setScenariosErr]  = useState('')
-  const [scenariosLoad, setScenariosLoad] = useState(false)
-
+  const [scenarios,      setScenarios]      = useState([])
+  const [scenariosErr,   setScenariosErr]   = useState('')
+  const [scenariosLoad,  setScenariosLoad]  = useState(false)
   const [selectedScenario, setSelectedScenario] = useState(null)
-  const [analysis,         setAnalysis]          = useState(null)
-  const [analysisLoading,  setAnalysisLoading]   = useState(false)
-  const [analysisErr,      setAnalysisErr]        = useState('')
-
+  const [scenarioMode,   setScenarioMode]   = useState('synthetic')  // 'synthetic' | 'live'
+  const [liveResult,     setLiveResult]     = useState(null)         // LiveAnalysisResponse
+  const [analysis,       setAnalysis]       = useState(null)
+  const [analysisLoading,setAnalysisLoading]= useState(false)
+  const [analysisErr,    setAnalysisErr]    = useState('')
   const [selectedCandidate, setSelectedCandidate] = useState(null)
-  const [resetKey,          setResetKey]           = useState(0)
-
-  // Workflow step tracking
+  const [resetKey,       setResetKey]       = useState(0)
   const [currentStep,    setCurrentStep]    = useState('analyse')
   const [completedSteps, setCompletedSteps] = useState([])
-
-  // Status live region ref for screen-reader announcements
   const liveRef = useRef(null)
 
   function announce(msg) {
     if (liveRef.current) liveRef.current.textContent = msg
   }
 
-  // ── Load scenario list on mount (useEffect, not useState) ──
   useEffect(() => {
     setScenariosLoad(true)
     apiGet('/scenarios')
@@ -226,7 +188,7 @@ export default function App() {
       setAnalysis(result)
       setCurrentStep('review')
       setCompletedSteps(['analyse'])
-      announce(`Analysis complete. Risk level: ${result.risk?.label ?? 'unknown'}`)
+      announce(`Analysis complete. Risk: ${result.risk?.label ?? 'unknown'}`)
     } catch (e) {
       setAnalysisErr(e.message)
       announce(`Analysis failed: ${e.message}`)
@@ -259,18 +221,81 @@ export default function App() {
   }
 
   const handleApprovalStepChange = (step) => {
-    // Called by ApprovalGate to advance the stepper
     setCurrentStep(step)
-    const stepOrder = ['analyse', 'review', 'approve', 'simulate', 'verify', 'report']
-    const idx = stepOrder.indexOf(step)
-    if (idx > 0) {
-      setCompletedSteps(stepOrder.slice(0, idx))
+    const order = ['analyse','review','approve','simulate','verify','report']
+    const idx   = order.indexOf(step)
+    if (idx > 0) setCompletedSteps(order.slice(0, idx))
+  }
+
+  // Handle live CelesTrak analysis and guarantee trajectory visualization.
+  // The live endpoint may return its initial scientific analysis without the
+  // sampled visualization contract. In that case, automatically request the
+  // registered scenario's full analysis — no second user click is required.
+  const handleLiveAnalysis = useCallback(async (liveAnalysisResponse) => {
+    setLiveResult(liveAnalysisResponse)
+
+    const initialAnalysis = liveAnalysisResponse?.analysis
+    if (!initialAnalysis?.scenario_id) {
+      setAnalysisErr('Live analysis response did not include a scenario ID.')
+      return
     }
+
+    setAnalysisLoading(true)
+    setAnalysisErr('')
+    setSelectedCandidate(null)
+    setCurrentStep('analyse')
+    announce('Preparing live trajectory visualization…')
+
+    try {
+      let completeAnalysis = initialAnalysis
+
+      if (!initialAnalysis.visualization) {
+        completeAnalysis = await apiPost(
+          `/scenarios/${initialAnalysis.scenario_id}/analyse`
+        )
+      }
+
+      if (!completeAnalysis?.visualization) {
+        throw new Error(
+          'Backend analysis completed but did not return trajectory visualization data.'
+        )
+      }
+
+      setAnalysis(completeAnalysis)
+      setSelectedScenario(completeAnalysis.scenario_id)
+      setCurrentStep('review')
+      setCompletedSteps(['analyse'])
+
+      announce(
+        `Live analysis complete. Risk: ${
+          completeAnalysis.risk?.label ?? 'unknown'
+        }. Trajectory visualization ready.`
+      )
+    } catch (error) {
+      setAnalysis(null)
+      setSelectedScenario(initialAnalysis.scenario_id)
+      setAnalysisErr(error.message)
+      announce(`Live trajectory visualization failed: ${error.message}`)
+    } finally {
+      setAnalysisLoading(false)
+    }
+  }, [])
+  const handleModeChange = (mode) => {
+    setScenarioMode(mode)
+    // Reset analysis state when switching modes
+    setAnalysis(null)
+    setSelectedScenario(null)
+    setSelectedCandidate(null)
+    setLiveResult(null)
+    setAnalysisErr('')
+    setCurrentStep('analyse')
+    setCompletedSteps([])
   }
 
   const handleReset = () => {
     setSelectedCandidate(null)
     setAnalysis(null)
+    setLiveResult(null)
     setResetKey(k => k + 1)
     setCurrentStep('analyse')
     setCompletedSteps([])
@@ -280,267 +305,276 @@ export default function App() {
   const selectedCandidateObj = analysis?.candidates?.find(
     c => c.candidate_id === selectedCandidate
   )
-
   const activeScenario = scenarios.find(s => s.scenario_id === selectedScenario)
 
   return (
-    <div className="app-shell">
+    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg)' }}>
       {/* Skip link */}
       <a href="#main-content" className="skip-link">Skip to main content</a>
 
-      {/* Screen-reader live region */}
-      <div
-        ref={liveRef}
-        aria-live="polite"
-        aria-atomic="true"
-        style={{ position: 'absolute', left: '-9999px', width: '1px', height: '1px', overflow: 'hidden' }}
-      />
+      {/* Live region */}
+      <div ref={liveRef} aria-live="polite" aria-atomic="true"
+           style={{ position: 'absolute', left: '-9999px', width: 1, height: 1, overflow: 'hidden' }} />
 
-      {/* ── TOP BAR ──────────────────────────────────────── */}
-      <header className="app-header" role="banner">
-        <div className="app-wordmark">
-          <div className="app-title">CollisionGuard AI</div>
-          <div className="app-subtitle">LEO Conjunction Decision Support</div>
+      {/* ── COMMAND BAR ─────────────────────────────────── */}
+      <header className="cmd-bar" role="banner">
+        <div className="cmd-brand">
+          <span className="cmd-title">CollisionGuard AI</span>
+          <span className="cmd-sub">LEO Conjunction Decision Support</span>
         </div>
 
-        <div
-          className="app-scenario-label"
-          aria-label={`Active scenario: ${activeScenario?.scenario_id ?? 'None selected'}`}
-        >
-          {activeScenario
-            ? `Scenario: ${activeScenario.scenario_id}`
-            : 'No scenario selected'}
+        <div className="cmd-divider" aria-hidden="true" />
+
+        <div className="cmd-scenario-chip" aria-label={`Active scenario: ${activeScenario?.scenario_id ?? 'none'}`}>
+          {activeScenario ? activeScenario.scenario_id : 'No scenario selected'}
         </div>
 
-        <HealthPill />
+        <div className="cmd-spacer" />
 
-        <div className="sim-badge" role="note" aria-label="Simulation only — not flight software">
-          SIM ONLY
+        <div className="cmd-actions">
+          <HealthPill />
+          <div className="cmd-divider" aria-hidden="true" />
+          {selectedScenario && !analysisLoading && (
+            <button
+              className="btn btn-primary"
+              onClick={() => runAnalysis(selectedScenario)}
+              aria-label="Run or re-run deterministic analysis"
+            >
+              {analysis ? 'Re-analyse' : 'Analyse'}
+            </button>
+          )}
+          {analysisLoading && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--tx-lo)' }}>
+              <span className="spinner" aria-hidden="true" />
+              Analysing…
+            </div>
+          )}
+          {analysis?.cached && (
+            <button className="btn btn-ghost btn-sm" onClick={handleInvalidateCache}
+                    aria-label="Invalidate cache and re-run">
+              Refresh Cache
+            </button>
+          )}
+          <div className="sim-chip" role="note" aria-label="Simulation only — not flight software">
+            SIM ONLY
+          </div>
         </div>
       </header>
 
-      {/* ── WORKFLOW STEPPER ─────────────────────────────── */}
-      <WorkflowStepper currentStep={currentStep} completedSteps={completedSteps} />
+      {/* ── STEPPER ─────────────────────────────────────── */}
+      <Stepper currentStep={currentStep} completedSteps={completedSteps} />
 
-      {/* ── MAIN CONTENT ─────────────────────────────────── */}
-      <main id="main-content" className="app-body">
+      {/* ── SCENARIO CONTROL ─────────────────────────────── */}
+      <section className="scenario-control" aria-labelledby="scen-hd">
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <h2 id="scen-hd" style={{ fontSize: 12, fontWeight: 700, color: 'var(--tx-lo)',
+                                    textTransform: 'uppercase', letterSpacing: '.07em' }}>
+            Scenario Selection
+          </h2>
+          {analysisErr && (
+            <span style={{ fontSize: 11, color: 'var(--red)' }} role="alert">
+              Analysis failed: {analysisErr}
+            </span>
+          )}
+        </div>
 
-        {/* 1. SCENARIO CONTROL ────────────────────────────── */}
-        <section aria-labelledby="section-scenario">
-          <div className="card">
-            <div className="card-header" id="section-scenario">
-              <span>Scenario Control</span>
-              {analysis?.cached && (
-                <span style={{ fontSize: '0.6rem', color: 'var(--green)', fontWeight: 600 }}>
-                  CACHED
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    style={{ marginLeft: '0.5rem' }}
-                    onClick={handleInvalidateCache}
-                    aria-label="Invalidate cache and re-run analysis"
-                  >
-                    Refresh
-                  </button>
-                </span>
-              )}
-            </div>
-            <div className="card-body">
-              {scenariosLoad && (
-                <div className="state-box" aria-live="polite">
-                  <span className="spinner" aria-hidden="true" /> Loading scenarios…
-                </div>
-              )}
-              {scenariosErr && (
-                <div className="state-box error" role="alert">
-                  Backend unavailable — failed to load scenarios: {scenariosErr}
-                </div>
-              )}
-              {!scenariosLoad && !scenariosErr && (
-                <>
-                  <ScenarioSelector
-                    scenarios={scenarios}
-                    selectedId={selectedScenario}
-                    onSelect={handleScenarioSelect}
-                    disabled={analysisLoading}
-                  />
-                  <div className="action-bar" style={{ marginTop: '0.9rem' }}>
-                    <button
-                      className="btn btn-primary"
-                      disabled={!selectedScenario || analysisLoading}
-                      onClick={() => runAnalysis(selectedScenario)}
-                      aria-disabled={!selectedScenario || analysisLoading}
-                      aria-label={
-                        !selectedScenario
-                          ? 'Select a scenario first'
-                          : analysisLoading
-                          ? 'Analysis running…'
-                          : 'Run deterministic analysis'
-                      }
-                    >
-                      {analysisLoading
-                        ? <><span className="spinner" aria-hidden="true" />Analysing…</>
-                        : 'Run Deterministic Analysis'}
-                    </button>
-                    {analysisLoading && (
-                      <span className="action-hint" aria-live="polite">
-                        Propagating orbits · Evaluating maneuvers · Requesting advisory…
-                      </span>
-                    )}
-                    {!selectedScenario && !analysisLoading && (
-                      <span className="action-hint">Select a scenario above to enable analysis.</span>
-                    )}
-                  </div>
-                </>
-              )}
-              {analysisErr && (
-                <div
-                  className="state-box error"
-                  role="alert"
-                  style={{ marginTop: '0.5rem', padding: '0.75rem' }}
-                >
-                  Analysis failed: {analysisErr}
-                </div>
-              )}
-            </div>
-          </div>
-        </section>
+        {/* Mode tabs: Synthetic Demo | Live CelesTrak */}
+        <div className="scenario-tabs" role="tablist" aria-label="Scenario source mode">
+          {SCENARIO_MODES.map(m => (
+            <button
+              key={m.id}
+              role="tab"
+              aria-selected={scenarioMode === m.id}
+              className={`scenario-tab ${scenarioMode === m.id ? (m.id === 'live' ? 'active-live' : 'active') : ''}`}
+              onClick={() => handleModeChange(m.id)}
+              disabled={analysisLoading}
+            >
+              {m.label}
+            </button>
+          ))}
+        </div>
 
-        {/* 2. MISSION SUMMARY STRIP ───────────────────────── */}
-        {analysis && (
-          <section aria-labelledby="section-summary">
-            <div className="card">
-              <div className="card-header">
-                <span id="section-summary">Mission Summary</span>
-                <span style={{ fontSize: '0.6rem', fontWeight: 400, textTransform: 'none', color: 'var(--muted)' }}>
-                  {new Date(analysis.analysis_timestamp).toUTCString()}
-                  {analysis.cached && ' · from cache'}
-                </span>
+        {/* Synthetic scenarios */}
+        {scenarioMode === 'synthetic' && (
+          <>
+            {scenariosLoad && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--tx-lo)' }}>
+                <span className="spinner" aria-hidden="true" /> Loading scenarios…
               </div>
-              <div className="card-body">
-                <ConjunctionMetrics analysis={analysis} />
+            )}
+            {scenariosErr && (
+              <div role="alert" style={{ fontSize: 12, color: 'var(--red)' }}>
+                Backend unavailable — cannot load scenarios: {scenariosErr}
               </div>
-            </div>
-          </section>
-        )}
-
-        {/* 3. PRIMARY VISUALIZATION ───────────────────────── */}
-        {analysis && (
-          <section aria-labelledby="section-viz">
-            <div className="card">
-              <div className="card-header">
-                <span id="section-viz">3D Trajectory — Closest Approach</span>
-                <span style={{ fontSize: '0.6rem', fontWeight: 400, textTransform: 'none', color: 'var(--muted)' }}>
-                  Approximate circular orbits · Not to scale
-                </span>
-              </div>
-              <div className="card-body" style={{ padding: '0.6rem' }}>
-                <TrajectoryPlot
-                  analysis={analysis}
-                  selectedCandidate={selectedCandidateObj}
+            )}
+            {!scenariosLoad && !scenariosErr && (
+              <>
+                <ScenarioGrid
+                  scenarios={scenarios}
+                  selectedId={selectedScenario}
+                  onSelect={handleScenarioSelect}
+                  disabled={analysisLoading}
                 />
-              </div>
-            </div>
-          </section>
-        )}
-
-        {/* 4. MANEUVER COMPARISON ─────────────────────────── */}
-        {analysis && (
-          <section aria-labelledby="section-maneuvers">
-            <div className="card">
-              <div className="card-header">
-                <span id="section-maneuvers">Maneuver Candidates</span>
-                <span style={{ fontSize: '0.6rem', fontWeight: 400, textTransform: 'none', color: 'var(--muted)' }}>
-                  {analysis.safe_count}/{analysis.total_count} safe
-                  &nbsp;·&nbsp;
-                  select a safe candidate to proceed
-                </span>
-              </div>
-              <div className="card-body">
-                <ManeuverTable
-                  analysis={analysis}
-                  advisory={analysis.advisory}
-                  selectedId={selectedCandidate}
-                  onSelect={handleCandidateSelect}
-                />
-                {analysis.evaluation_note && (
-                  <p
-                    style={{
-                      marginTop: '0.65rem',
-                      fontSize: '0.62rem',
-                      color: 'var(--yellow)',
-                      borderLeft: '2px solid var(--yellow-border)',
-                      paddingLeft: '0.5rem',
-                    }}
-                    role="note"
-                  >
-                    {analysis.evaluation_note}
+                {!selectedScenario && (
+                  <p style={{ fontSize: 11, color: 'var(--tx-lo)', marginTop: 8 }}>
+                    Select a scenario above, then click Analyse in the command bar.
                   </p>
                 )}
-              </div>
-            </div>
-          </section>
+              </>
+            )}
+          </>
         )}
 
-        {/* 5. GRANITE ADVISORY ────────────────────────────── */}
-        {analysis?.advisory && (
-          <section aria-labelledby="section-advisory">
-            <div className="card">
-              <div className="card-header">
-                <span id="section-advisory">AI Advisory — Separate from Backend Safety Gate</span>
-                <span style={{ fontSize: '0.6rem', fontWeight: 400, textTransform: 'none', color: 'var(--muted)' }}>
-                  Backend physics values are authoritative
-                </span>
-              </div>
-              <div className="card-body">
-                <GraniteAdvisory advisory={analysis.advisory} />
-              </div>
-            </div>
-          </section>
+        {/* Live CelesTrak mode */}
+        {scenarioMode === 'live' && (
+          <LiveCelestrakPanel
+            onAnalysis={handleLiveAnalysis}
+            disabled={analysisLoading}
+          />
         )}
+      </section>
 
-        {/* 6. DATA QUALITY ────────────────────────────────── */}
-        {analysis?.data_quality && (
-          <section aria-labelledby="section-dq">
-            <div className="card">
-              <div className="card-header">
-                <span id="section-dq">Data Quality &amp; Scientific Limitations</span>
-              </div>
-              <div className="card-body">
-                <DataQualityPanel quality={analysis.data_quality} />
-              </div>
-            </div>
-          </section>
-        )}
+      {/* ── CONTEXT STRIP ─────────────────────────────────── */}
+      {analysis && (
+        <div className="ctx-strip" aria-label="Analysis context">
+          <div className="ctx-item">
+            <span className="ctx-label">Scenario</span>
+            <span className="ctx-value">{analysis.scenario_id}</span>
+          </div>
+          <div className="ctx-item">
+            <span className="ctx-label">Analysed</span>
+            <span className="ctx-value">{new Date(analysis.analysis_timestamp).toUTCString()}</span>
+          </div>
+          <div className="ctx-item">
+            <span className="ctx-label">Cache</span>
+            <span className="ctx-value">{analysis.cached ? 'HIT' : 'MISS'}</span>
+          </div>
+          <div className="ctx-item">
+            <span className="ctx-label">Threshold</span>
+            <span className="ctx-value">{analysis.conjunction_threshold_km} km</span>
+          </div>
+          <div className="ctx-item">
+            <span className="ctx-label">Candidates</span>
+            <span className="ctx-value">{analysis.safe_count}/{analysis.total_count} safe</span>
+          </div>
+        </div>
+      )}
 
-        {/* 7. HUMAN APPROVAL GATE ─────────────────────────── */}
+      {/* ── MAIN WORKSPACE ────────────────────────────────── */}
+      <main id="main-content">
+        {/* above-the-fold split: viz left, risk right */}
+        <div className="workspace">
+          {/* LEFT — Trajectory Visualization */}
+          <div aria-labelledby="viz-title">
+            <TrajectoryPlot
+              analysis={analysis}
+              selectedCandidate={selectedCandidateObj}
+              loading={analysisLoading}
+            />
+          </div>
+
+          {/* RIGHT — Risk Panel */}
+          <div className="risk-panel" aria-label="Risk status panel">
+            {!analysis && !analysisLoading && (
+              <div style={{ fontSize: 12, color: 'var(--tx-lo)', paddingTop: 16, lineHeight: 1.6 }}>
+                Run analysis to see risk metrics, miss distance, and time to closest approach.
+              </div>
+            )}
+            {analysisLoading && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--tx-lo)' }}>
+                <span className="spinner" aria-hidden="true" />
+                Computing propagation and maneuver evaluation…
+              </div>
+            )}
+            {analysis && <ConjunctionMetrics analysis={analysis} />}
+          </div>
+        </div>
+
+        {/* ── BELOW FOLD ──────────────────────────────────── */}
         {analysis && (
-          <section aria-labelledby="section-approval">
-            <div className="card">
-              <div className="card-header">
-                <span id="section-approval">Human Approval Gate — Simulated Execution</span>
-                <span style={{ fontSize: '0.6rem', fontWeight: 400, textTransform: 'none', color: 'var(--yellow)' }}>
-                  Human approval required before execution
-                </span>
+          <div className="lower-body">
+
+            {/* Maneuver candidates */}
+            <section aria-labelledby="maneuverhd">
+              <div className="card">
+                <div className="card-hd">
+                  <span id="maneuverhd">Maneuver Candidates</span>
+                  <span className="card-hd-sub">
+                    {analysis.safe_count}/{analysis.total_count} safe · select a safe row to proceed
+                  </span>
+                </div>
+                <div className="card-bd">
+                  <ManeuverTable
+                    analysis={analysis}
+                    advisory={analysis.advisory}
+                    selectedId={selectedCandidate}
+                    onSelect={handleCandidateSelect}
+                  />
+                  {analysis.evaluation_note && (
+                    <p style={{ marginTop: 10, fontSize: 11, color: 'var(--amber)',
+                                borderLeft: '2px solid var(--amber-bdr)', paddingLeft: 8 }}>
+                      {analysis.evaluation_note}
+                    </p>
+                  )}
+                </div>
               </div>
-              <div className="card-body">
-                <ApprovalGate
-                  key={resetKey}
-                  scenarioId={selectedScenario}
-                  selectedId={selectedCandidate}
-                  analysis={analysis}
-                  onReset={handleReset}
-                  onStepChange={handleApprovalStepChange}
-                />
+            </section>
+
+            {/* Granite advisory */}
+            {analysis.advisory && (
+              <section aria-labelledby="advisoryhd">
+                <div className="card">
+                  <div className="card-hd">
+                    <span id="advisoryhd">AI Advisory</span>
+                    <span className="card-hd-sub">Backend physics values are authoritative</span>
+                  </div>
+                  <div className="card-bd">
+                    <GraniteAdvisory advisory={analysis.advisory} />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Data quality */}
+            {analysis.data_quality && (
+              <section aria-labelledby="dqhd">
+                <div className="card">
+                  <div className="card-hd"><span id="dqhd">Data Quality &amp; Limitations</span></div>
+                  <div className="card-bd">
+                    <DataQuality quality={analysis.data_quality} />
+                  </div>
+                </div>
+              </section>
+            )}
+
+            {/* Human approval gate */}
+            <section aria-labelledby="approvalhd">
+              <div className="card">
+                <div className="card-hd">
+                  <span id="approvalhd">Human Approval Gate — Simulated Execution</span>
+                  <span className="card-hd-sub" style={{ color: 'var(--amber)' }}>
+                    Human approval required
+                  </span>
+                </div>
+                <div className="card-bd">
+                  <ApprovalGate
+                    key={resetKey}
+                    scenarioId={selectedScenario}
+                    selectedId={selectedCandidate}
+                    analysis={analysis}
+                    onReset={handleReset}
+                    onStepChange={handleApprovalStepChange}
+                  />
+                </div>
               </div>
-            </div>
-          </section>
+            </section>
+          </div>
         )}
       </main>
 
-      {/* ── FOOTER ───────────────────────────────────────── */}
+      {/* ── FOOTER ──────────────────────────────────────── */}
       <footer className="app-footer" role="contentinfo">
-        Human-supervised decision-support prototype · Simulation only — not flight software ·
-        CollisionGuard AI
+        Human-supervised decision-support prototype · Simulation only — not flight software · CollisionGuard AI
       </footer>
     </div>
   )

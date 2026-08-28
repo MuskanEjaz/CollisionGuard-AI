@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     # Server
     backend_host: str = "0.0.0.0"
     backend_port: int = 8000
-    cors_origin: str = "http://localhost:5173"
+    cors_origin: str = "http://localhost:5173,http://127.0.0.1:5173"
 
     # IBM watsonx.ai credentials (Phase 6+)
     # Canonical env var names match IBM documentation: WATSONX_APIKEY etc.
@@ -34,6 +34,11 @@ class Settings(BaseSettings):
     # Configurable model ID -- never hardcode a model assumption in client code.
     # Default is a reasonable Granite model; override via WATSONX_MODEL_ID in .env.
     watsonx_model_id: str = "ibm/granite-3-8b-instruct"  # WATSONX_MODEL_ID
+
+    # CelesTrak GP client settings (Phase 8+)
+    # No credentials required -- CelesTrak public data.
+    celestrak_timeout_s: float = 15.0   # CELESTRAK_TIMEOUT_S  (max 15.0 enforced in router)
+    celestrak_cache_ttl_s: float = 300.0  # CELESTRAK_CACHE_TTL_S
 
     model_config = SettingsConfigDict(
         env_file=".env",

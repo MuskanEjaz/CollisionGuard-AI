@@ -116,7 +116,7 @@ export default function ApprovalGate({
   // ── IDLE ──────────────────────────────────────────────
   if (phase === 'idle') {
     return (
-      <div>
+      <div className="approval-idle">
         <div className="action-bar">
           <button
             className="btn btn-warn"
@@ -148,19 +148,8 @@ export default function ApprovalGate({
 
         {/* Selected candidate summary */}
         {candidate && (
-          <div
-            style={{
-              marginTop: '0.75rem',
-              padding: '0.6rem 0.75rem',
-              background: 'var(--surface2)',
-              border: '1px solid var(--border)',
-              borderRadius: 'var(--radius-md)',
-              fontSize: '0.7rem',
-              color: 'var(--text-dim)',
-            }}
-            aria-label="Selected candidate summary"
-          >
-            <strong style={{ color: 'var(--accent)' }}>Selected:</strong>{' '}
+          <div className="selected-summary" aria-label="Selected candidate summary">
+            <strong style={{ color: 'var(--cyan)' }}>Selected:</strong>{' '}
             {candidate.label} — Δv {candidate.delta_v_ms?.toFixed(2)} m/s
             {candidate.fuel_cost_kg != null && ` · Fuel ${candidate.fuel_cost_kg.toFixed(4)} kg`}
             {candidate.post_maneuver_miss_distance_km != null &&
@@ -192,26 +181,26 @@ export default function ApprovalGate({
         </p>
 
         {/* Maneuver summary grid */}
-        <div className="confirm-kv-grid" aria-label="Maneuver summary">
-          <div className="confirm-kv">
+        <div className="confirm-grid" aria-label="Maneuver summary">
+          <div className="ckv">
             <span className="k">Candidate ID</span>
             <span className="v">{selectedId}</span>
           </div>
-          <div className="confirm-kv">
+          <div className="ckv">
             <span className="k">Direction</span>
             <span className="v">{candidate.direction ?? 'Not provided'}</span>
           </div>
-          <div className="confirm-kv">
+          <div className="ckv">
             <span className="k">Delta-v</span>
             <span className="v">{candidate.delta_v_ms?.toFixed(2)} m/s</span>
           </div>
-          <div className="confirm-kv">
+          <div className="ckv">
             <span className="k">Est. fuel</span>
             <span className="v">
               {candidate.fuel_cost_kg != null ? candidate.fuel_cost_kg.toFixed(4) + ' kg' : 'Not provided'}
             </span>
           </div>
-          <div className="confirm-kv">
+          <div className="ckv">
             <span className="k">Post-maneuver miss</span>
             <span className="v">
               {candidate.post_maneuver_miss_distance_km != null
@@ -219,9 +208,9 @@ export default function ApprovalGate({
                 : 'Not provided'}
             </span>
           </div>
-          <div className="confirm-kv">
+          <div className="ckv">
             <span className="k">Safety gate</span>
-            <span className="v" style={{ color: 'var(--green)' }}>Passed ✓</span>
+            <span className="v" style={{ color: 'var(--green-hi)' }}>Passed ✓</span>
           </div>
         </div>
 
@@ -255,7 +244,7 @@ export default function ApprovalGate({
   if (phase === 'approved' || phase === 'executing') {
     return (
       <div
-        style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', color: 'var(--text-dim)', fontSize: '0.8rem' }}
+        style={{ display: 'flex', alignItems: 'center', gap: 'var(--s3)', color: 'var(--tx-mid)', fontSize: '13px' }}
         aria-live="polite"
         aria-busy="true"
       >
@@ -273,17 +262,17 @@ export default function ApprovalGate({
     return (
       <div>
         {/* Execution result */}
-        <div className="exec-result" role="region" aria-label="Simulated execution result">
+        <div className="exec-panel" role="region" aria-label="Simulated execution result">
           <h3>Simulated Execution Complete</h3>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">Status</span>
             <span className="v">{execResult.status}</span>
           </div>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">Candidate applied</span>
             <span className="v">{execResult.candidate_id}</span>
           </div>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">Delta-v applied</span>
             <span className="v">
               {execResult.delta_v_applied_ms != null
@@ -291,7 +280,7 @@ export default function ApprovalGate({
                 : 'Not provided'}
             </span>
           </div>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">Fuel consumed</span>
             <span className="v">
               {execResult.fuel_consumed_kg != null
@@ -299,12 +288,12 @@ export default function ApprovalGate({
                 : 'Not provided'}
             </span>
           </div>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">Post-maneuver miss distance</span>
             <span
               className="v"
               style={{
-                color: verificationResolved ? 'var(--green)' : 'var(--yellow)',
+                color: verificationResolved ? 'var(--green-hi)' : 'var(--amber)',
               }}
             >
               {execResult.post_maneuver_miss_distance_km != null
@@ -312,7 +301,7 @@ export default function ApprovalGate({
                 : 'Not provided'}
             </span>
           </div>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">Executed at (UTC)</span>
             <span className="v">
               {execResult.executed_at
@@ -322,7 +311,7 @@ export default function ApprovalGate({
           </div>
           {execResult.execution_label && (
             <div
-              style={{ marginTop: '0.55rem', fontSize: '0.62rem', color: 'var(--yellow)' }}
+              style={{ marginTop: 'var(--s3)', fontSize: '10px', color: 'var(--amber)' }}
               role="note"
             >
               {execResult.execution_label}
@@ -332,12 +321,12 @@ export default function ApprovalGate({
 
         {/* Post-maneuver verification panel */}
         <div
-          className="verification-panel"
+          className="verif-panel"
           role="region"
           aria-label="Post-maneuver verification"
         >
           <h4>Post-Maneuver Verification</h4>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">New miss distance</span>
             <span className="v">
               {execResult.post_maneuver_miss_distance_km != null
@@ -345,15 +334,15 @@ export default function ApprovalGate({
                 : 'Not provided'}
             </span>
           </div>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">Conjunction threshold</span>
             <span className="v">{analysis?.conjunction_threshold_km ?? '1.0'} km</span>
           </div>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">Resolution status</span>
             <span
               className="v"
-              style={{ color: verificationResolved ? 'var(--green)' : 'var(--yellow)' }}
+              style={{ color: verificationResolved ? 'var(--green-hi)' : 'var(--amber)' }}
             >
               {execResult.post_maneuver_miss_distance_km == null
                 ? 'Not provided'
@@ -362,12 +351,12 @@ export default function ApprovalGate({
                 : '⚠ Monitor — still within watch area'}
             </span>
           </div>
-          <div className="exec-kv">
+          <div className="exec-row">
             <span className="k">Verification source</span>
             <span className="v">Backend deterministic evaluation</span>
           </div>
           <div
-            style={{ marginTop: '0.5rem', fontSize: '0.62rem', color: 'var(--muted)', fontStyle: 'italic' }}
+            style={{ marginTop: 'var(--s3)', fontSize: '10px', color: 'var(--tx-lo)', fontStyle: 'italic' }}
             role="note"
           >
             Verification is based on simulated state-vector perturbation.
@@ -377,22 +366,22 @@ export default function ApprovalGate({
 
         {/* Incident report */}
         {report && (
-          <div className="incident-section" role="region" aria-label="Incident report">
-            <div className="incident-header">
+          <div className="report-wrap" role="region" aria-label="Incident report">
+            <div className="report-hd">
               <span>Incident Report</span>
-              <span style={{ color: 'var(--muted)', textTransform: 'none', fontWeight: 400 }}>
+              <span style={{ color: 'var(--tx-lo)', textTransform: 'none', fontWeight: 400 }}>
                 Generated by: {report.generated_by}
                 {report.generated_by === 'granite' && ' (IBM Granite)'}
                 {report.generated_by !== 'granite' && ' (deterministic template)'}
               </span>
             </div>
-            <pre className="incident-report" aria-label="Incident report text">
+            <pre className="report-body" aria-label="Incident report text">
               {report.report_text}
             </pre>
           </div>
         )}
 
-        <div className="action-bar" style={{ marginTop: '0.85rem' }}>
+        <div className="action-bar" style={{ marginTop: 'var(--s5)' }}>
           <button
             className="btn btn-ghost"
             onClick={handleReset}
@@ -408,12 +397,12 @@ export default function ApprovalGate({
   // ── REJECTED ──────────────────────────────────────────
   if (phase === 'rejected') {
     return (
-      <div className="exec-result rejected" role="alert">
+      <div className="exec-panel rejected" role="alert">
         <h3>Safety Gate: Execution Rejected</h3>
-        <p style={{ fontSize: '0.72rem', marginTop: '0.4rem', color: 'var(--red)' }}>
+        <p style={{ fontSize: '12px', marginTop: 'var(--s2)', color: 'var(--red)' }}>
           {err || 'Safety gate rejected this candidate. Select a different safe candidate.'}
         </p>
-        <div className="action-bar" style={{ marginTop: '0.75rem' }}>
+        <div className="action-bar" style={{ marginTop: 'var(--s4)' }}>
           <button className="btn btn-ghost" onClick={handleReset}>Reset</button>
         </div>
       </div>
@@ -423,12 +412,12 @@ export default function ApprovalGate({
   // ── ERROR ─────────────────────────────────────────────
   if (phase === 'error') {
     return (
-      <div className="exec-result rejected" role="alert">
+      <div className="exec-panel rejected" role="alert">
         <h3>Backend Error</h3>
-        <p style={{ fontSize: '0.72rem', marginTop: '0.4rem', color: 'var(--text-dim)' }}>
+        <p style={{ fontSize: '12px', marginTop: 'var(--s2)', color: 'var(--tx-mid)' }}>
           {err || 'An error occurred during execution.'}
         </p>
-        <div className="action-bar" style={{ marginTop: '0.75rem' }}>
+        <div className="action-bar" style={{ marginTop: 'var(--s4)' }}>
           <button className="btn btn-ghost" onClick={() => setPhase('idle')}>Retry</button>
           <button className="btn btn-ghost" onClick={handleReset}>Reset</button>
         </div>

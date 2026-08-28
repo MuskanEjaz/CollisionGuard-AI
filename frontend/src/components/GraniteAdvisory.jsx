@@ -4,7 +4,7 @@
  * Source provenance is always shown:
  *   - "IBM Granite — Live" (if source === 'granite')
  *   - "Deterministic fallback — Granite unavailable" (if source === 'deterministic_fallback')
- *   - "Live Granite unverified" warning always shown
+ *   - "Live Granite unverified" warning always shown when not live
  *
  * Granite is never shown as the source of physics values.
  * Validation warnings are displayed prominently.
@@ -19,9 +19,9 @@ export default function GraniteAdvisory({ advisory }) {
   return (
     <div aria-label="AI Advisory panel">
       {/* Source provenance header */}
-      <div className="granite-header">
+      <div className="granite-hd">
         <span
-          className={`granite-badge ${isLive ? 'live' : 'fallback'}`}
+          className={`g-badge ${isLive ? 'live' : 'fallback'}`}
           role="status"
           aria-label={
             isLive
@@ -35,7 +35,7 @@ export default function GraniteAdvisory({ advisory }) {
         </span>
 
         {!isLive && (
-          <span style={{ fontSize: '0.62rem', color: 'var(--muted)' }}>
+          <span style={{ fontSize: '10px', color: 'var(--tx-lo)' }}>
             Ranking by backend baseline score
           </span>
         )}
@@ -43,7 +43,7 @@ export default function GraniteAdvisory({ advisory }) {
         {/* "Live Granite unverified" notice — always show unless proven live */}
         {!isLive && (
           <span
-            className="granite-badge unverified"
+            className="g-badge unverified"
             role="note"
             aria-label="Live Granite has not been verified in this session"
           >
@@ -54,8 +54,8 @@ export default function GraniteAdvisory({ advisory }) {
 
       {/* Provenance disclaimer */}
       <div
-        className="granite-provenance"
-        style={{ marginBottom: '0.7rem' }}
+        className="g-prov"
+        style={{ marginBottom: 'var(--s4)' }}
         role="note"
       >
         Physics values (miss distance, TCA, fuel, robustness) are computed by the
@@ -65,7 +65,7 @@ export default function GraniteAdvisory({ advisory }) {
 
       {/* Advisory summary */}
       <div
-        className="granite-summary"
+        className="g-summary"
         aria-label={`${isLive ? 'IBM Granite' : 'Deterministic fallback'} advisory summary`}
       >
         {advisory.granite_summary ?? 'No advisory available.'}
@@ -73,7 +73,7 @@ export default function GraniteAdvisory({ advisory }) {
 
       {/* Advisory note */}
       {advisory.granite_note && (
-        <div className="granite-note" role="note">
+        <div className="g-note" role="note">
           {advisory.granite_note}
         </div>
       )}
@@ -81,12 +81,12 @@ export default function GraniteAdvisory({ advisory }) {
       {/* Validation warnings */}
       {advisory.validation_warnings?.length > 0 && (
         <div
-          style={{ marginTop: '0.55rem' }}
+          style={{ marginTop: 'var(--s3)' }}
           role="alert"
           aria-label="Advisory validation warnings"
         >
           {advisory.validation_warnings.map((w, i) => (
-            <div key={i} className="granite-warning">
+            <div key={i} className="g-warning">
               <span aria-hidden="true">⚠</span>
               {w}
             </div>

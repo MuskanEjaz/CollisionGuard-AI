@@ -1,485 +1,703 @@
-# CollisionGuard AI
+CollisionGuard AI
 
-> **Simulation only — not flight software.**
-> CollisionGuard AI is a human-supervised collision-avoidance decision-support prototype.
-> It is not autonomous, not flight-ready, not certified, and not operational-grade.
+Human-supervised collision-avoidance decision support for low-Earth orbit
 
----
 
-## One-line pitch
 
-A mission-control interface that gives a human satellite operator a physics-grounded
-conjunction decision within seconds — backed by IBM Granite for advisory ranking and
-a hard deterministic safety gate that Granite cannot override.
 
----
 
-## Responsible-use disclaimer
 
-> CollisionGuard AI must not be used for real spacecraft command, operational
-> conjunction screening, or any safety-critical decision.
-> All results are screening-level estimates from synthetic data.
-> **This is a prototype demonstration only.**
+[!IMPORTANT]
+Simulation only — not flight software.
 
----
+CollisionGuard AI is a hackathon decision-support prototype. It is not autonomous, certified, flight-ready, or suitable for operational spacecraft control. Every maneuver requires explicit human approval and is executed only in simulation.
 
-## Challenge
+The pitch
 
-IBM AI Builders Challenge — August 2026
-Theme: **Advance Space Exploration with AI**
+CollisionGuard AI turns orbital-element data into a transparent conjunction-response workflow: propagate two objects, find their closest approach, disclose the uncertainty behind the risk estimate, compare avoidance maneuvers, obtain a grounded IBM Granite advisory, require human approval, verify the simulated result, and generate an incident report.
 
----
+Deterministic software owns the physics and safety decisions. IBM Granite supports explanation and ranking. The human operator remains in control.
 
-## Project snapshot
+Why it matters
 
-| Item | Value |
-|---|---|
-| Backend | FastAPI + uvicorn, Python 3.12 |
-| Frontend | React 18 + Vite 5 + Plotly |
-| Physics engine | SGP4 (sgp4 library), TEME frame |
-| TCA search | Coarse 30-s grid + Brent refinement (tol = 0.01 s) |
-| AI advisory | IBM Granite via watsonx.ai (deterministic fallback included) |
-| Safety model | Deterministic safety gate; Granite cannot override; human approval required |
-| Test suite | 140 fast tests passing; 1 slow test deferred |
-| Build status | Production build verified (Plotly chunk warning expected) |
-| Live Granite | Not verified in this repository — Pushkar owns |
+Low-Earth orbit is increasingly congested. When a protected satellite and another tracked object approach one another, an operator must quickly answer:
 
----
+When will closest approach occur?
 
-## Problem statement
+What are the predicted miss distance and relative velocity?
 
-More than 27,000 tracked objects orbit Earth, with hundreds of thousands of
-untracked fragments. Each tracked satellite faces hundreds of conjunction
-screening events per year. A typical operator has minutes to review propagation
-geometry, evaluate maneuver candidates, assess fuel cost, and decide whether to
-command a burn — a slow, information-dense, cognitively demanding process.
+What data and uncertainty support the risk estimate?
 
----
+Which maneuver improves separation without wasting excessive fuel?
 
-## Solution overview
+Does the recommendation remain safe under perturbations?
 
-CollisionGuard AI compresses the conjunction decision loop into a single
-dashboard screen. Given TLE data for a maneuverable satellite and one threat
-object, it:
+Can the decision be reviewed, approved, verified, and documented?
 
-1. **Propagates** both orbits over a 24-hour window using the SGP4 model (TEME frame)
-2. **Finds** TCA via coarse 30-second grid sweep followed by Brent's-method
-   refinement (tol = 0.01 s) — no external numerical solver
-3. **Classifies** collision risk against a 1 km conjunction threshold
-4. **Evaluates** up to 5 candidate delta-v maneuvers through a deterministic
-   safety gate (fuel cost via Tsiolkovsky, post-maneuver miss, improvement threshold)
-5. **Presents** IBM Granite's advisory ranking of safe candidates, grounded
-   against backend physics values that Granite cannot alter
-6. **Requires human approval** before any simulated execution; the safety gate
-   re-validates the chosen candidate server-side
-7. **Reports** a simulated execution result and incident report
+Existing conjunction workflows can be information-dense and fragmented. CollisionGuard AI presents the decision chain in one explainable mission-control interface.
 
-The operator makes every consequential decision.
+What the system does
 
----
+For exactly two LEO objects—a protected satellite and one threat object—the system:
 
-## Complete decision loop
+Loads a committed synthetic scenario or fetches public CelesTrak GP elements.
 
-```
-TLE data ingested
-    |
-    v
-Propagate both objects (SGP4, TEME frame, 24-hour window)
-    |
-    v
-Find TCA (coarse 30-s grid → Brent's method, tol=0.01 s)
-    |
-    v
-Classify risk (miss distance vs 1 km threshold)
-    |
-    v
-Evaluate 5 candidate maneuvers (safety gate: dv budget, fuel, post-miss, improvement)
-    |-- REJECTED: candidate marked unsafe, reason recorded, never sent to Granite
-    |
-    v  SAFE candidates only
-IBM Granite advisory ranking (rank + explanation, physics values from backend)
-    |-- Numeric conflict → Granite value rejected, backend value used, warning logged
-    |-- Credentials absent → deterministic score-based fallback, source="deterministic_fallback"
-    |
-    v
-Human operator reviews dashboard: miss distance, TCA, risk badge, maneuver table, advisory
-    |
-    v
-Human selects candidate → backend safety gate re-validates (is_safe must be True)
-    |-- REJECTED: unsafe candidate → rejection response, no execution recorded
-    |
-    v  APPROVED
-Human confirms simulated execution (second explicit action required)
-    |
-    v
-Backend executes simulation: delta-v applied, fuel consumed, post-maneuver miss reported
-(Simulated only — no spacecraft command is issued)
-    |
-    v
-Incident report generated (Granite narrative or deterministic template)
-```
+Initializes SGP4-compatible orbital records.
 
----
+Propagates both objects in the TEME frame.
 
-## Screenshot gallery
+Searches for the time of closest approach (TCA).
 
-> Screenshots will be added by Muskan after running the application end-to-end.
-> Files are stored in `docs/images/` (repository) and
-> `C:\Users\FINE LAPTOP\Documents\August Challenge\Evidence\screenshots\` (full evidence set).
+Computes miss distance and relative velocity at TCA.
 
-| # | Screenshot | Status |
-|---|---|---|
-| 01 | Dashboard overview | Pending — Muskan |
-| 02 | Conjunction scenario loaded | Pending — Muskan |
-| 03 | Trajectory closest approach | Pending — Muskan |
-| 04 | Risk evidence panel | Pending — Muskan |
-| 05 | Maneuver candidates comparison | Pending — Muskan |
-| 06 | Granite or fallback advisory | Pending — Muskan |
-| 07 | Human approval confirmation | Pending — Muskan |
-| 08 | Simulated execution | Pending — Muskan |
-| 09 | Post-maneuver verification | Pending — Muskan |
-| 10 | Incident report | Pending — Muskan |
-| 11 | Safe scenario | Pending — Muskan |
-| 12 | Responsive mobile view | Pending — Muskan |
-| 13 | Backend fast tests | Pending — Muskan |
-| 14 | Frontend production build | Pending — Muskan |
-| 15 | CORS preflight tests | Pending — Muskan |
-| 16 | Live Granite smoke test | **Pending — Pushkar** (requires real credentials) |
-| 17 | Real 1,000-trial test | **Pending — Surya** (requires slow test run) |
+Labels the estimate according to its actual data and uncertainty basis.
 
-Once screenshots are placed in `docs/images/`, update links using this pattern:
+Generates five bounded candidate delta-v maneuvers.
 
-```markdown
-![CollisionGuard AI dashboard](docs/images/01_dashboard_overview.png)
-```
+Re-propagates and evaluates each candidate for safety, fuel, and separation.
 
----
+Performs robustness evaluation when explicitly requested.
 
-## Architecture
+Sends only backend-approved safe candidates to IBM Granite.
 
-```mermaid
+Requires human approval before simulated execution.
+
+Verifies the post-maneuver outcome and produces an incident report.
+
+No final analysis number is hardcoded in the React interface. Results shown to the operator come from the backend contract.
+
+Complete decision loop
+
 flowchart TD
-    subgraph Frontend["Frontend (React 18 + Vite 5, port 5173)"]
-        UI["App.jsx · Scenario selector + analysis dashboard"]
-        CM["ConjunctionMetrics · Risk badge, miss distance, TCA"]
-        MT["ManeuverTable · Candidates + Granite rank column"]
-        GA["GraniteAdvisory · Summary, source badge, warnings"]
-        AG["ApprovalGate · idle→confirming→approved→executing→done"]
-        TP["TrajectoryPlot · Plotly 3D (approximate circular orbits)"]
-    end
+    A["Synthetic scenario or CelesTrak GP data"] --> B["SGP4 propagation"]
+    B --> C["TCA, miss distance and relative velocity"]
+    C --> D["Risk and uncertainty disclosure"]
+    D --> E["Five candidate maneuvers"]
+    E --> F["Re-propagation and safety gates"]
+    F --> G["Robustness evaluation"]
+    G --> H["Granite advisory for safe candidates"]
+    H --> I["Human approval"]
+    I --> J["Simulated execution"]
+    J --> K["Verification and incident report"]
 
-    subgraph Backend["Backend (FastAPI + uvicorn, port 8000)"]
-        direction TB
-        RT_S["GET /scenarios  GET /scenarios/{id}  POST /scenarios/{id}/propagate"]
-        RT_M["GET /scenarios/{id}/maneuvers  POST /scenarios/{id}/evaluate"]
-        RT_R["POST /scenarios/{id}/maneuvers/{cid}/robustness"]
-        RT_G["POST /scenarios/{id}/advise"]
-        RT_A["POST /scenarios/{id}/analyse (cached)  DELETE /scenarios/{id}/cache
-              GET /cache/stats  POST /scenarios/{id}/approve
-              POST /scenarios/{id}/execute  POST /scenarios/{id}/incident-report"]
+Why CollisionGuard AI is different
 
-        PROP["propagation.py · SGP4, TEME, Brent TCA"]
-        EVAL["maneuver_evaluator.py · Safety gate"]
-        GC["granite_client.py · Granite or deterministic fallback"]
-        CACHE["analysis_cache.py · TTL cache (5 min, SHA-256)"]
-    end
+1. Physics and AI have separate authority
 
-    UI -- "GET/POST/DELETE via fetch" --> RT_S & RT_M & RT_R & RT_G & RT_A
-    RT_M --> PROP & EVAL
-    RT_G --> EVAL & GC
-    RT_A --> CACHE & PROP & EVAL & GC
-    EVAL -->|"safe candidates only"| GC
-    GC -->|"numeric conflict → backend wins"| RT_A
-```
+SGP4 propagation, TCA, miss distance, relative velocity, delta-v, fuel estimates, safety constraints, and post-maneuver results are computed by deterministic backend modules.
 
----
+IBM Granite may rank and explain safe alternatives, but it cannot:
 
-## Key differentiators
+Create orbital-mechanics values
 
-- **Deterministic safety structurally enforced** — unsafe candidates never reach
-  Granite; Granite output validated at 1% tolerance; conflicts silently overridden
-- **Two-stage TCA search** — coarse 30-second grid + Brent's parabolic interpolation
-  achieves sub-second-accuracy TCA without scipy
-- **Double approval gate** — human clicks Request then Confirm; backend
-  re-validates safety at both steps; one-use tokens prevent replay
-- **Full deterministic fallback** — system runs completely without watsonx credentials
+Change a backend-computed number
 
----
+Reclassify an unsafe candidate as safe
 
-## Deterministic physics vs Granite boundary
+Approve or execute a maneuver
 
-| Responsibility | Deterministic backend | IBM Granite |
-|---|---|---|
-| SGP4 propagation, TCA, miss distance | Yes | No |
-| Fuel cost (Tsiolkovsky) | Yes | No |
-| Safety gate (`is_safe`) | Yes | **Cannot override** |
-| Post-maneuver miss, robustness | Yes | No |
-| Candidate ranking | Fallback only | Advisory (safe candidates only) |
-| Explanation text | No | Yes (advisory) |
-| Execution approval | Human + backend | **Cannot approve** |
+Bypass the human operator
 
-Granite receives only backend-validated safe candidates. Every numeric value
-Granite returns is validated against the backend-computed value at 1% tolerance.
-Conflicts are silently overridden; a warning is added to `validation_warnings`.
+2. AI output is numerically grounded
 
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for full detail.
+Granite responses are checked against backend-computed values before display. If an AI-provided number conflicts with the physics layer, the backend value remains authoritative and the response can carry a validation warning.
 
----
+3. Uncertainty is shown, not hidden
 
-## Implemented capabilities (verified)
+The interface distinguishes between:
 
-| Capability | Status |
-|---|---|
-| SGP4 propagation (TEME frame) | Implemented and tested |
-| Two-stage TCA search (coarse + Brent, tol=0.01 s) | Implemented and tested |
-| Conjunction risk classification (3 levels, 1 km threshold) | Implemented and tested |
-| 5 hardcoded candidate delta-v maneuvers | Implemented and tested |
-| Maneuver safety evaluation (fuel, post-miss, improvement) | Implemented and tested |
-| Monte Carlo robustness (1,000 trials, `@pytest.mark.slow`) | Implemented; **slow test deferred** |
-| IBM Granite advisory with numeric grounding | Implemented; mocked in tests; **live unverified** |
-| Deterministic fallback ranking | Implemented and tested |
-| In-memory TTL cache (5 min, SHA-256 key) | Implemented and tested |
-| Human approval gate (two-step, server-side re-validation) | Implemented and tested |
-| Simulated execution + post-maneuver verification | Implemented and tested |
-| Incident report (Granite or deterministic template) | Implemented and tested |
-| Dark mission-control React/Vite dashboard | Implemented; build verified |
-| 3D Plotly trajectory visualisation (approximate circular orbits) | Implemented |
+Synthetic demonstration data, where the uncertainty basis is explicitly labelled as synthetic
 
----
+Live CelesTrak public GP elements, which do not provide operational conjunction covariance
 
-## API summary
+The live-data path is therefore described as a screening-level estimate, not an operational probability of collision.
 
-Full schema documentation: [`docs/API_REFERENCE.md`](docs/API_REFERENCE.md)
+4. The system remains usable without external AI
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/health` | Backend health and version |
-| `GET` | `/scenarios` | List all scenarios |
-| `GET` | `/scenarios/{id}` | Single scenario by ID |
-| `POST` | `/scenarios/{id}/propagate` | SGP4 propagation + TCA search |
-| `GET` | `/scenarios/{id}/maneuvers` | Unevaluated candidate list |
-| `POST` | `/scenarios/{id}/evaluate` | Safety-evaluate all candidates |
-| `POST` | `/scenarios/{id}/maneuvers/{cid}/robustness` | Monte Carlo robustness |
-| `POST` | `/scenarios/{id}/advise` | Granite advisory (or deterministic fallback) |
-| `POST` | `/scenarios/{id}/analyse` | Full pipeline (cached) |
-| `DELETE` | `/scenarios/{id}/cache` | Invalidate cached analysis |
-| `GET` | `/cache/stats` | Cache state |
-| `POST` | `/scenarios/{id}/approve` | Human approval (safety re-validated) |
-| `POST` | `/scenarios/{id}/execute` | Simulated execution (approval required) |
-| `POST` | `/scenarios/{id}/incident-report` | Post-execution incident report |
+If watsonx.ai credentials or model access are unavailable, the system uses a deterministic fallback and labels its source. Physics, safety gates, approval, simulation, and verification remain functional.
 
-Interactive docs: `http://localhost:8000/docs`
+5. A committed demo prevents network dependency
 
----
+CONJ-001 and SAFE-001 provide reproducible synthetic scenarios, so the main judging flow does not depend on CelesTrak availability or network latency.
 
-## Project structure
+Architecture
 
-```
+flowchart LR
+    UI["React mission-control UI"] --> API["FastAPI contract"]
+    API --> PHY["SGP4 and TCA engine"]
+    API --> RISK["Risk and uncertainty layer"]
+    API --> MAN["Maneuver evaluator"]
+    MAN --> ROB["Robustness verification"]
+    MAN --> AI["IBM Granite or fallback"]
+    API --> DATA["Synthetic JSON or CelesTrak OMM/JSON"]
+
+Boundary
+
+Responsibility
+
+Physics layer
+
+Propagation, states, TCA, miss distance, relative velocity
+
+Risk layer
+
+Classification, estimate basis, covariance disclosure
+
+Maneuver layer
+
+Candidate generation, fuel, constraints, post-maneuver evaluation
+
+Robustness layer
+
+Perturbation-based safety evidence
+
+Granite layer
+
+Advisory ranking and grounded explanation of safe candidates
+
+Approval layer
+
+Human authorization and server-side revalidation
+
+Reporting layer
+
+Verification result and incident narrative
+
+Real 3D orbital visualization
+
+The dashboard uses Three.js through React Three Fiber and Drei. It renders:
+
+A contextual 3D Earth
+
+A protected-satellite model
+
+An irregular threat/debris model
+
+Backend-derived protected and threat trajectory samples
+
+TCA positions and the miss-distance connector
+
+Global, protected, threat, TCA, and reset camera controls
+
+Hover-to-highlight trajectory discovery
+
+Click-to-pin selection
+
+Keyboard-operable controls and textual fallbacks
+
+The frontend does not generate a fake circular orbit for the production visualization. Trajectory geometry comes from the backend visualization contract.
+
+Visual disclosure: Object sizes may be enlarged for visibility. Trajectory distances remain tied to propagated coordinates. Earth geography is contextual unless explicitly transformed to match the propagated frame.
+
+Data modes
+
+Synthetic Demo
+
+The committed demo path is deterministic and available offline:
+
+Scenario
+
+Purpose
+
+CONJ-001
+
+Close approach requiring maneuver review
+
+SAFE-001
+
+Safe pass showing the no-action workflow
+
+Synthetic metadata is intentionally explicit:
+
+Data source: committed synthetic LEO demo scenario
+
+Data quality: demonstration data
+
+Uncertainty basis: synthetic covariance
+
+Operational use: simulation only—not operational tracking data
+
+Live CelesTrak
+
+Users can enter two different positive NORAD catalog IDs. The backend fetches public GP elements in OMM/JSON form, preserves provenance, initializes SGP4 records, registers the scenario, and runs the same analysis pipeline.
+
+The interface reports:
+
+Provider and format
+
+Retrieval timestamp
+
+Object names and NORAD catalog IDs
+
+Element epochs and ages
+
+Covariance availability
+
+Coordinate frame and estimate basis
+
+Public GP elements do not include the operational covariance required for a certified collision-probability assessment. The application does not invent one.
+
+Scientific integrity
+
+Propagation
+
+Propagator: SGP4
+
+Analysis frame: TEME
+
+Objects: exactly two
+
+Regime: LEO prototype scope
+
+TCA: bounded coarse search followed by numerical refinement
+
+Relative velocity: difference between both propagated velocity vectors at TCA
+
+Risk language
+
+The system does not display an unsupported bare confidence percentage.
+
+A risk statement is accompanied by available evidence such as:
+
+Source and retrieval time
+
+Element epoch and age
+
+Covariance availability or synthetic uncertainty basis
+
+Coordinate frame
+
+Trial count and success fraction when robustness evaluation actually runs
+
+NASA CARA probability tiers may be referenced as guidance only. CollisionGuard AI is not certified against NASA operational procedures.
+
+Maneuvers
+
+The prototype evaluates five predefined candidate maneuvers. It does not claim to be a global trajectory optimizer. Each candidate is evaluated using backend-computed safety, delta-v, fuel, and post-maneuver separation values.
+
+IBM Granite integration
+
+IBM Granite via watsonx.ai performs legitimate decision-support work:
+
+Multi-factor ranking of backend-approved safe maneuvers
+
+Plain-language explanation of the risk and recommendation
+
+Grounded incident-report generation
+
+The runtime response identifies whether the advisory source is live Granite or the deterministic fallback. The model ID is configurable and reported by the application rather than hardcoded into this README.
+
+Non-negotiable Granite safety rule
+
+Unsafe candidate → rejected by deterministic backend → never sent to Granite
+Safe candidate   → may be ranked and explained by Granite
+Any candidate    → cannot execute without human approval
+
+Human approval and simulated execution
+
+CollisionGuard AI is deliberately human-supervised.
+
+The operator must:
+
+Review the computed conjunction evidence.
+
+Select a backend-approved safe candidate.
+
+Request approval.
+
+Confirm the simulated action.
+
+Review the post-maneuver verification.
+
+The backend revalidates the candidate before simulated execution. No spacecraft command is produced.
+
+Technology stack
+
+Area
+
+Technology
+
+Frontend
+
+React 18, Vite 5
+
+3D visualization
+
+Three.js, React Three Fiber, Drei
+
+Backend API
+
+Python, FastAPI, Pydantic
+
+Propagation
+
+sgp4
+
+Numerical work
+
+NumPy and project numerical utilities
+
+AI
+
+IBM Granite through watsonx.ai
+
+Live orbital elements
+
+CelesTrak OMM/JSON public GP data
+
+Testing
+
+Pytest
+
+Local persistence
+
+Committed JSON and lightweight application state
+
+Repository structure
+
 CollisionGuard AI/
-├── .env.example                  Environment variable template
-├── .gitignore
-├── README.md
-├── LICENSE
 ├── backend/
-│   ├── main.py                   FastAPI entry point; routers; CORS (GET, POST, DELETE)
-│   ├── config.py                 pydantic-settings; watsonx env vars; lru_cache
-│   ├── requirements.txt
-│   ├── pytest.ini
-│   ├── propagation.py            SGP4, TEME frame, Brent TCA search
-│   ├── maneuver_candidates.py    5 hardcoded delta-v candidates
-│   ├── maneuver_evaluator.py     Safety gate: fuel, post-maneuver miss, score
-│   ├── monte_carlo.py            1,000-trial robustness checker
-│   ├── granite_client.py         Granite client; numeric grounding; deterministic fallback
-│   ├── granite_smoke_test.py     Manual-only live Granite smoke test
-│   ├── analysis_cache.py         In-memory TTL cache (SHA-256, 300 s TTL)
-│   ├── routers/                  health, scenarios, maneuvers, robustness, granite, analysis
-│   ├── schemas/                  health, scenario, maneuver, monte_carlo, granite, analysis
-│   ├── data/scenarios/           conjunction_scenario.json, safe_scenario.json
-│   └── tests/                    140 fast tests across 9 files + 1 slow deferred
+│   ├── data/scenarios/          # Guaranteed synthetic demo inputs
+│   ├── routers/                 # FastAPI route modules
+│   ├── schemas/                 # Pydantic API contracts
+│   ├── tests/                   # Focused and integration tests
+│   ├── celestrak_client.py      # Public GP element retrieval
+│   ├── scenario_registry.py     # Runtime live-scenario registration
+│   ├── propagation.py           # SGP4 states and closest approach
+│   ├── maneuver_candidates.py   # Five bounded candidates
+│   ├── maneuver_evaluator.py    # Deterministic safety evaluation
+│   ├── monte_carlo.py           # Explicit robustness evaluation
+│   ├── granite_client.py        # Granite guardrails and fallback
+│   └── main.py                  # Application entry point
 ├── frontend/
-│   ├── package.json              React 18 + Vite 5 + react-plotly.js
-│   ├── vite.config.js
-│   ├── src/
-│   │   ├── App.jsx               Full dashboard
-│   │   ├── api/client.js         apiGet, apiPost, apiDel; VITE_API_BASE_URL
-│   │   └── components/           HealthStatus, ScenarioPanel, ConjunctionMetrics,
-│   │                             ManeuverTable, GraniteAdvisory, TrajectoryPlot, ApprovalGate
-└── docs/
-    ├── ARCHITECTURE.md           Full system architecture
-    ├── API_REFERENCE.md          Complete endpoint schemas
-    ├── SCIENTIFIC_ASSUMPTIONS.md Propagation, TCA, covariance, Monte Carlo assumptions
-    ├── SAFETY_AND_RESPONSIBLE_USE.md
-    ├── TESTING.md                All test procedures and evidence requirements
-    ├── IBM_BOB_USAGE.md          Bob session evidence
-    ├── TEAM_HANDOFF.md           Per-member task assignments and merge order
-    ├── SUBMISSION_COPY.md        Draft submission text
-    ├── CURRENT_STATUS.md         Detailed status of every item
-    └── DEMO_VIDEO_PLAN.md        3-minute script for Suryansh sharma
-```
+│   ├── src/api/                 # Backend client
+│   ├── src/components/          # Dashboard and Three.js components
+│   ├── src/App.jsx              # Workflow orchestration
+│   └── src/styles.css           # Mission-control design system
+├── docs/                        # Architecture, API, safety and evidence docs
+├── .env.example                 # Secret-free configuration template
+├── LICENSE
+└── README.md
 
----
+Quick start on Windows
 
-## Quick start (Windows PowerShell)
+Prerequisites
 
-```powershell
-# 1 — Configure secrets
-Copy-Item .env.example .env
-# Edit .env — leave WATSONX_* blank for deterministic-fallback mode. Never commit .env.
+Python 3.11+
 
-# 2 — Backend
+Node.js 20+
+
+npm
+
+Git
+
+1. Clone
+
+git clone https://github.com/MuskanEjaz/CollisionGuard-AI.git
+cd "CollisionGuard-AI"
+
+2. Configure the backend
+
+Copy-Item .env.example backend\.env
 cd backend
-pip install -r requirements.txt
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-# API: http://localhost:8000   Docs: http://localhost:8000/docs
+python -m pip install -r requirements.txt
 
-# 3 — Frontend (new terminal)
-cd frontend
+The deterministic workflow works with blank watsonx values. To enable live Granite, set valid values only in backend/.env:
+
+WATSONX_APIKEY=
+WATSONX_PROJECT_ID=
+WATSONX_URL=https://us-south.ml.cloud.ibm.com
+WATSONX_MODEL_ID=
+
+Never commit .env.
+
+3. Start the backend
+
+cd "C:\path\to\CollisionGuard AI\backend"
+python -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+
+API: http://127.0.0.1:8000
+
+Interactive API docs: http://127.0.0.1:8000/docs
+
+4. Start the frontend
+
+Open a second terminal:
+
+cd "C:\path\to\CollisionGuard AI\frontend"
 npm install
-npm run dev
-# Dashboard: http://localhost:5173
+npm run dev -- --host 127.0.0.1
 
-# 4 — Fast tests
+Open http://127.0.0.1:5173.
+
+Recommended judging flow
+
+Use the committed synthetic conjunction as the guaranteed primary demo:
+
+Open Synthetic Demo.
+
+Select CONJ-001.
+
+Run deterministic analysis.
+
+Show the backend-derived 3D paths and TCA connector.
+
+Explain miss distance, relative velocity, source, quality, and uncertainty basis.
+
+Compare the five maneuver candidates.
+
+Show Granite advisory or the clearly labelled fallback.
+
+Select a safe candidate.
+
+Demonstrate the human approval gate.
+
+Execute the action in simulation.
+
+Show post-maneuver verification.
+
+Generate the incident report.
+
+Briefly show SAFE-001.
+
+Present live CelesTrak as an additional capability, not the only demo path.
+
+Validation policy
+
+Run tests against the final merged commit before publishing results.
+
+Frontend production build
+
+cd frontend
+npm run build
+
+Backend fast suite
+
 cd backend
-pytest tests/ -v -m "not slow"
-# Expected: 140 passed, 1 deselected (~7-9 min on this hardware)
-```
+python -m pytest tests -m "not slow"
 
----
+Explicit slow robustness test
 
-## Environment variables
+python -m pytest tests/test_monte_carlo.py -m slow -v
 
-Copy `.env.example` to `.env`. Never commit `.env`.
+The slow test is intentionally separate. Do not run it during ordinary UI or documentation changes.
 
-| Variable | Default | Purpose |
-|---|---|---|
-| `APP_ENV` | `development` | Runtime label |
-| `APP_VERSION` | `0.1.0` | Reported in `/health` |
-| `BACKEND_HOST` | `0.0.0.0` | uvicorn bind host |
-| `BACKEND_PORT` | `8000` | uvicorn bind port |
-| `CORS_ORIGIN` | `http://localhost:5173` | Allowed frontend origin |
-| `WATSONX_APIKEY` | *(blank)* | IBM watsonx.ai API key — blank = fallback mode |
-| `WATSONX_PROJECT_ID` | *(blank)* | IBM watsonx.ai project ID |
-| `WATSONX_URL` | *(blank)* | IBM watsonx.ai endpoint (must be HTTPS) |
-| `WATSONX_MODEL_ID` | `ibm/granite-3-8b-instruct` | Granite model (configurable) |
+Historical test counts are not used as a current badge because substantial live-data and Three.js changes were added afterward. Publish a final count only after running validation on the final merged commit.
 
-Note: `WATSONX_APIKEY` has no underscore between API and KEY — matches IBM docs.
+See docs/TESTING.md and docs/CURRENT_STATUS.md for the latest evidence.
 
-Frontend (`frontend/.env.local`, gitignored): `VITE_API_BASE_URL=http://localhost:8000`
+API
 
----
+The interactive OpenAPI specification at http://127.0.0.1:8000/docs is the authoritative route contract.
 
-## Test status
+Core workflows include:
 
-| Test suite | Status | Command |
-|---|---|---|
-| Fast backend tests (140 tests) | **140 passed, 1 deselected** · 1120.50 s | `pytest tests/ -v -m "not slow"` |
-| CORS preflight (6 tests) | **6 passed** · 8.37 s | `pytest tests/test_cors.py -v` |
-| Frontend build | **Succeeded** · 2m 9s · Plotly chunk warning (expected) | `npm run build` |
-| Real 1,000-trial Monte Carlo | **Not yet executed** — deferred; Surya owns | `pytest tests/test_monte_carlo.py -v -m slow` |
-| Live Granite smoke test | **Not yet verified** — requires real credentials; Pushkar owns | `python granite_smoke_test.py` |
+Scenario listing and detail
 
-See [`docs/TESTING.md`](docs/TESTING.md) for full procedures and evidence requirements.
+Synthetic and live-scenario analysis
 
----
+CelesTrak catalog retrieval
 
-## Live Granite status
+Propagation and TCA results
 
-**Not verified in this repository.** The integration is fully implemented and
-all 42 Granite tests pass with mocked responses. No live watsonx.ai response
-has been confirmed. Pushkar's task is to obtain credentials, run the smoke test,
-and provide evidence for submission.
+Candidate generation and evaluation
 
----
+Explicit robustness evaluation
 
-## IBM Bob usage
+Granite advisory
 
-CollisionGuard AI was built using IBM Bob as the primary development tool,
-covering architecture, phase-by-phase implementation, test generation, debugging,
-and documentation. See [`docs/IBM_BOB_USAGE.md`](docs/IBM_BOB_USAGE.md).
+Cache inspection and invalidation
 
----
+Human approval
 
-## Judging criteria alignment
+Simulated execution
 
-| Criterion | Evidence |
-|---|---|
-| **Technical Execution** | FastAPI + Pydantic v2; SGP4 + Brent TCA; 140 tests; deterministic safety gate |
-| **Innovation** | Numeric grounding guardrail at 1% tolerance; two-step approval with server-side re-validation; full deterministic fallback |
-| **Challenge Fit** | Direct AI application to space safety; Granite with explicit authority constraints; real conjunction workflow |
-| **Feasibility** | Runs on a laptop; no cloud required; both scenarios work after `pip install` + `npm install` |
-| **Real-World Impact** | Approximates real conjunction response; human oversight architecturally mandatory; honest limitation labelling |
+Incident reporting
 
----
+See docs/API_REFERENCE.md for the maintained endpoint reference.
 
-## Demo video
+Responsible use
 
-**[PLACEHOLDER — Suryansh sharma will record and upload the final demo video]**
+CollisionGuard AI must not be used to:
 
-Public video URL: `[TO BE FILLED BY Suryansh sharma]`  
-Maximum duration: 3 minutes  
-See [`docs/DEMO_VIDEO_PLAN.md`](docs/DEMO_VIDEO_PLAN.md) for the full script.
+Command a spacecraft
 
----
+Replace certified flight-dynamics software
 
-## Scientific methodology
+Make operational collision-avoidance decisions
 
-See [`docs/SCIENTIFIC_ASSUMPTIONS.md`](docs/SCIENTIFIC_ASSUMPTIONS.md) for:
-- SGP4 frame and Julian date convention (jday UTC, not Skyfield tt_jd)
-- TCA search parameters (30-second grid, Brent tol=0.01 s, 2,880 evaluations)
-- Conjunction threshold (1.0 km, hard-coded)
-- Monte Carlo covariance (100 m position, 0.01 m/s velocity, diagonal only)
-- Maneuver generation (5 hardcoded candidates, not optimised for geometry)
-- Baseline score formula (simplified linear weighting, labelled as such)
+Present public GP data as precision tracking data
 
----
+Present synthetic covariance as measured covariance
 
-## Known limitations
+Treat Granite output as authoritative physics
 
-- **Synthetic TLEs only** — no live CelesTrak data fetch
-- **Circular orbit visualisation** — TrajectoryPlot approximates orbits as circles; SGP4 is used for all physics
-- **Two-body propagation** — J2, drag, solar pressure, lunar/solar gravity not modelled
-- **Diagonal covariance** — Monte Carlo ignores position-velocity cross-terms
-- **No authentication** — approval gate uses placeholder `operator_id`
-- **No Pc calculation** — risk metric is miss distance only
-- **In-memory cache** — resets on server restart
-- **Live Granite unverified** — mocked in all tests
-- **Real 1,000-trial test deferred** — `@pytest.mark.slow`, not yet executed
+Bypass human review
 
----
+See docs/SAFETY_AND_RESPONSIBLE_USE.md.
 
-## Future work
+Known limitations
 
-- Live TLE/OMM ingestion from CelesTrak or Space-Track
-- Real CDM covariance for Pc calculation
-- Multi-object conjunction screening
-- Optimal delta-v targeting (differential correction)
-- User authentication and persistent audit trail
-- J2 and atmospheric drag perturbation modelling
-- Frontend testing with Vitest/React Testing Library
+Exactly two objects are evaluated per scenario.
 
----
+The prototype scope is limited to LEO.
 
-## Responsible use
+CelesTrak public GP data does not include operational covariance.
 
-CollisionGuard AI must not be used for real spacecraft command, operational
-conjunction screening, or any safety-critical decision without independent
-verification. All results are screening-level estimates from synthetic data.
-See [`docs/SAFETY_AND_RESPONSIBLE_USE.md`](docs/SAFETY_AND_RESPONSIBLE_USE.md).
+Live network calls can time out or be unavailable.
 
----
+Candidate maneuvers are predefined options, not globally optimized burns.
 
-## Team
+Higher-fidelity operational force models and certified validation are out of scope.
 
-| Member | Role |
-|---|---|
-| **Muskan Ejaz** | UI, final README, documentation and submission |
-| **Pushkar Malhotra** | IBM Granite integration, live verification, grounded intelligence and AI evidence |
-| **Suryansh sharma** | Backend safety, performance, real 1,000-trial Monte Carlo, demo video |
+Maneuver execution is simulated only.
 
-See [`docs/TEAM_HANDOFF.md`](docs/TEAM_HANDOFF.md) for detailed task assignments and merge order.
+Object models are enlarged for visibility.
 
----
+Earth orientation is contextual unless explicitly frame-aligned.
 
-## License
+The in-memory live-scenario registry and cache reset with the backend process.
 
-See [LICENSE](LICENSE).
+The prototype does not provide authentication suitable for operational use.
+
+Future work
+
+Authorized conjunction data-message and covariance ingestion
+
+Independent probability-of-collision validation
+
+Higher-fidelity force modelling
+
+Geometry-aware maneuver optimization
+
+Multi-object screening
+
+Persistent audit logs and authenticated operator roles
+
+Independent aerospace-software verification
+
+These items are future work and are not claimed as implemented.
+
+IBM AI Builders Challenge
+
+CollisionGuard AI was built for the IBM AI Builders Challenge — August 2026, under the Advance Space Exploration with AI theme.
+
+IBM technology contributes directly through:
+
+IBM Granite advisory ranking
+
+Grounded operator explanations
+
+Incident-report generation
+
+Guardrail validation against deterministic backend values
+
+IBM Bob-assisted architecture, implementation, debugging, testing, and documentation
+
+The project uses AI where judgment and explanation add value while retaining deterministic control over physics and safety.
+
+Judging-criteria alignment
+
+Criterion
+
+Evidence
+
+Challenge fit
+
+Direct application to conjunction assessment and space sustainability
+
+Technical execution
+
+SGP4 pipeline, typed API contracts, Three.js visualization, safety gates
+
+Meaningful IBM AI
+
+Granite ranks and explains safe options within explicit authority limits
+
+Innovation
+
+Numerically grounded AI plus mandatory human approval and verification
+
+Feasibility
+
+Laptop-runnable stack with committed offline scenarios and deterministic fallback
+
+Responsible AI
+
+Transparent uncertainty, no invented physics, no autonomous execution
+
+Presentation
+
+Mission-control workflow from input through verified simulated outcome
+
+Evidence and documentation
+
+Architecture
+
+API reference
+
+Scientific assumptions
+
+Safety and responsible use
+
+Testing
+
+Current status
+
+IBM Bob usage
+
+Team handoff
+
+Demo plan
+
+Required final evidence
+
+Full 3D conjunction scene
+
+TCA and risk evidence
+
+Maneuver comparison
+
+Granite live or fallback source badge
+
+Human approval and simulated execution
+
+Post-maneuver verification
+
+Incident report
+
+CelesTrak provenance
+
+Final build and test output
+
+Team
+
+Member
+
+Primary ownership
+
+Muskan Ejaz
+
+Product integration, UI, documentation, evidence, and submission
+
+Pushkar
+
+IBM Granite integration, grounding, and AI evidence
+
+Surya
+
+Backend validation, performance, final robustness evidence, and demo production
+
+Demo video
+
+Public demo URL: [ADD FINAL PUBLIC VIDEO URL]
+
+Do not replace this placeholder with a private or inaccessible link.
+
+License
+
+See LICENSE.
+
+Final statement
+
+CollisionGuard AI does not claim to replace professional conjunction-assessment systems. It demonstrates how deterministic orbital analysis, transparent uncertainty handling, IBM Granite, and mandatory human oversight can be combined into an explainable collision-avoidance decision-support workflow.

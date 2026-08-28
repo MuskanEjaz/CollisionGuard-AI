@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CollisionGuard AI - Visualization Verification</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        .container { max-width: 1200px; margin: 0 auto; }
+        h1 { color: #4a9eff; margin-bottom: 20px; }
+        .status-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 15px; margin-bottom: 30px; }
+        .status-card {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+        }
+        .status-card h3 { color: #4a9eff; margin-bottom: 10px; font-size: 0.9em; text-transform: uppercase; }
+        .status-value { font-size: 1.1em; font-weight: 500; }
+        .status-value.ok { color: #4ade80; }
+        .status-value.pending { color: #facc15; }
+        .status-value.error { color: #f87171; }
+        .test-section {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .test-section h2 { color: #4a9eff; margin-bottom: 15px; font-size: 1.1em; }
+        .test-list { list-style: none; }
+        .test-item {
+            padding: 10px;
+            margin-bottom: 8px;
+            background: #1a1a1a;
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .test-item.pending { border-left: 3px solid #facc15; }
+        .test-item.ok { border-left: 3px solid #4ade80; }
+        .test-item.error { border-left: 3px solid #f87171; }
+        .test-icon { font-weight: bold; min-width: 20px; }
+        .actions {
+            background: #2a2a2a;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        button {
+            background: #4a9eff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1em;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover { background: #3a8eef; }
+        button:disabled { background: #666; cursor: not-allowed; }
+        .code-block {
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85em;
+            overflow-x: auto;
+            margin-top: 10px;
+        }
+        .log { 
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            padding: 15px;
+            font-family: 'Monaco', 'Menlo', monospace;
+            font-size: 0.85em;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 10px;
+        }
+        .log-entry { margin-bottom: 5px; }
+        .log-ok { color: #4ade80; }
+        .log-error { color: #f87171; }
+        .log-info { color: #4a9eff; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛰️ CollisionGuard AI - Visualization Verification</h1>
+        
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>Backend API</h3>
+                <div class="status-value pending" id="backend-status">Testing...</div>
+            </div>
+            <div class="status-card">
+                <h3>CORS Support</h3>
+                <div class="status-value pending" id="cors-status">Testing...</div>
+            </div>
+            <div class="status-card">
+                <h3>Visualization Data</h3>
+                <div class="status-value pending" id="viz-status">Testing...</div>
+            </div>
+            <div class="status-card">
+                <h3>Vite Dev Server</h3>
+                <div class="status-value pending" id="vite-status">Testing...</div>
+            </div>
+        </div>
+
+        <div class="test-section">
+            <h2>🔍 Automated Tests</h2>
+            <ul class="test-list" id="test-list"></ul>
+        </div>
+
+        <div class="actions">
+            <h2>📋 Actions</h2>
+            <button onclick="runAllTests()">Run All Tests</button>
+            <button onclick="testBackendHealth()">Test Backend Health</button>
+            <button onclick="testAnalysisAPI()">Test Analysis API</button>
+            <button onclick="openVizApp()">Open Visualization App (127.0.0.1:5173)</button>
+            <button onclick="clearLog()">Clear Log</button>
+        </div>
+
+        <div class="test-section">
+            <h2>📡 Live Log</h2>
+            <div class="log" id="log"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>📖 Instructions</h2>
+            <ol style="padding-left: 20px; line-height: 1.8;">
+                <li>Click "Run All Tests" to check backend connectivity</li>
+                <li>If all tests pass, click "Open Visualization App"</li>
+                <li>In the app: Select "CONJ-001" scenario from Synthetic Demo</li>
+                <li>Click "Analyse" button</li>
+                <li>Wait for Three.js scene to render (Earth, satellites, trajectories)</li>
+                <li>Test interactions: hover trajectories, click to pin, use camera controls</li>
+                <li>Expected to see: cyan protected orbit, red threat orbit, amber TCA markers</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+        const VITE_URL = 'http://127.0.0.1:5173';
+        
+        function log(message, type = 'info') {
+            const logDiv = document.getElementById('log');
+            const entry = document.createElement('div');
+            entry.className = `log-entry log-${type}`;
+            const timestamp = new Date().toLocaleTimeString();
+            entry.textContent = `[${timestamp}] ${message}`;
+            logDiv.appendChild(entry);
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            document.getElementById('log').innerHTML = '';
+        }
+
+        function addTest(name, status) {
+            const list = document.getElementById('test-list');
+            const item = document.createElement('li');
+            item.className = `test-item ${status}`;
+            
+            const icon = {
+                'pending': '⏳',
+                'ok': '✓',
+                'error': '✗'
+            }[status];
+            
+            item.innerHTML = `
+                <span class="test-icon">${icon}</span>
+                <span>${name}</span>
+            `;
+            list.appendChild(item);
+        }
+
+        async function testBackendHealth() {
+            log('Testing backend health...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                document.getElementById('backend-status').textContent = '✓ OK';
+                document.getElementById('backend-status').className = 'status-value ok';
+                addTest('Backend Health Check', 'ok');
+                log(`Backend responded: ${data.status}`, 'ok');
+                return true;
+            } catch (error) {
+                document.getElementById('backend-status').textContent = '✗ Error';
+                document.getElementById('backend-status').className = 'status-value error';
+                addTest('Backend Health Check', 'error');
+                log(`Backend error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testAnalysisAPI() {
+            log('Testing analysis API...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/scenarios`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const scenarios = await response.json();
+                
+                if (!scenarios.scenarios || scenarios.scenarios.length === 0) {
+                    throw new Error('No scenarios returned');
+                }
+                
+                addTest(`Loaded ${scenarios.scenarios.length} scenarios`, 'ok');
+                log(`Scenarios: ${scenarios.scenarios.map(s => s.id).join(', ')}`, 'ok');
+                
+                // Test analysis for first scenario
+                const scenarioId = scenarios.scenarios[0].id;
+                const analysisResp = await fetch(`${API_BASE}/scenarios/${scenarioId}/analyse`, {
+                    method: 'POST'
+                });
+                
+                if (!analysisResp.ok) throw new Error(`Analysis failed: ${analysisResp.status}`);
+                const analysis = await analysisResp.json();
+                
+                if (!analysis.visualization) throw new Error('No visualization data returned');
+                const viz = analysis.visualization;
+                
+                document.getElementById('viz-status').textContent = '✓ OK';
+                document.getElementById('viz-status').className = 'status-value ok';
+                
+                addTest(`Analysis for ${scenarioId}`, 'ok');
+                addTest(`Visualization samples: ${viz.samples.length}`, 'ok');
+                addTest(`TCA miss distance: ${viz.tca.miss_distance_km.toFixed(4)} km`, 'ok');
+                addTest(`Coordinate frame: ${viz.coordinate_frame}`, 'ok');
+                
+                log(`✓ Visualization data complete`, 'ok');
+                log(`  - Samples: ${viz.samples.length}`, 'ok');
+                log(`  - Frame: ${viz.coordinate_frame}`, 'ok');
+                log(`  - Miss distance: ${viz.tca.miss_distance_km} km`, 'ok');
+                log(`  - Rel velocity: ${viz.tca.relative_velocity_km_s} km/s`, 'ok');
+                
+                return true;
+            } catch (error) {
+                document.getElementById('viz-status').textContent = '✗ Error';
+                document.getElementById('viz-status').className = 'status-value error';
+                addTest('Analysis API Test', 'error');
+                log(`Analysis error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testViteServer() {
+            log('Testing Vite dev server...', 'info');
+            try {
+                const response = await fetch(`${VITE_URL}/`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                document.getElementById('vite-status').textContent = '✓ OK';
+                document.getElementById('vite-status').className = 'status-value ok';
+                addTest('Vite Dev Server', 'ok');
+                log('Vite dev server is running', 'ok');
+                return true;
+            } catch (error) {
+                document.getElementById('vite-status').textContent = '✗ Error';
+                document.getElementById('vite-status').className = 'status-value error';
+                addTest('Vite Dev Server', 'error');
+                log(`Vite not reachable: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function testCORS() {
+            log('Testing CORS...', 'info');
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const corsHeader = response.headers.get('access-control-allow-origin');
+                if (corsHeader) {
+                    document.getElementById('cors-status').textContent = '✓ OK';
+                    document.getElementById('cors-status').className = 'status-value ok';
+                    addTest('CORS Headers Present', 'ok');
+                    log(`CORS origin: ${corsHeader}`, 'ok');
+                    return true;
+                } else {
+                    throw new Error('No CORS header in response');
+                }
+            } catch (error) {
+                document.getElementById('cors-status').textContent = '⚠ Check';
+                document.getElementById('cors-status').className = 'status-value pending';
+                addTest('CORS Headers', 'error');
+                log(`CORS check inconclusive: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        async function runAllTests() {
+            document.getElementById('test-list').innerHTML = '';
+            clearLog();
+            log('Starting all tests...', 'info');
+            
+            const backendOk = await testBackendHealth();
+            const corsOk = await testCORS();
+            const analysisOk = await testAnalysisAPI();
+            const viteOk = await testViteServer();
+            
+            log('', 'info');
+            if (backendOk && corsOk && analysisOk && viteOk) {
+                log('✓ All tests passed! Ready to visualize.', 'ok');
+                log('Click "Open Visualization App" to proceed.', 'ok');
+            } else {
+                log('⚠ Some tests failed. Check errors above.', 'error');
+            }
+        }
+
+        function openVizApp() {
+            log(`Opening ${VITE_URL}...`, 'info');
+            window.open(VITE_URL, 'collisionguard-viz');
+        }
+
+        // Run tests on page load
+        window.addEventListener('load', () => {
+            log('Page loaded. Ready for testing.', 'info');
+        });
+    </script>
+</body>
+</html>

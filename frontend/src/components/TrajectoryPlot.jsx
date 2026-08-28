@@ -1,212 +1,424 @@
 /**
- * TrajectoryPlot — 3D Plotly visualization of orbital paths and TCA marker.
+ * TrajectoryPlot — Main integration component for orbital trajectory visualization.
  *
- * Shows original and post-maneuver paths; marks closest approach.
+ * Replaces the old Plotly-based implementation with a real Three.js/WebGL scene.
+ * Maintains the same public API for compatibility with existing imports.
  *
- * SIMPLIFIED FOR PROTOTYPE: orbit positions are approximated from orbital
- * inclination and RAAN using simple circular-orbit geometry. Not a real
- * ephemeris. SGP4 is used for all physics in the backend.
+ * Features:
+ * - Realistic 3D Earth (procedural, no texture hotlinking)
+ * - Protected satellite & threat debris 3D objects
+ * - Backend-propagated trajectory lines (not frontend circularOrbit)
+ * - TCA geometry with markers, connector, midpoint
+ * - Hover-to-highlight, click-to-pin interactions
+ * - Interactive legend with keyboard support
+ * - Global/Local conjunction views
+ * - Camera presets: Global, Focus Protected, Focus Threat, Focus TCA, Reset
+ * - Accessible text summary and keyboard controls
+ * - WebGL fallback detection
  *
- * Accessibility: provides a text summary of the visualization state.
- * Reset-view button restores the default camera angle.
- *
- * Human-supervised decision-support prototype. Simulation only.
+ * Scientific Integrity:
+ * - All trajectory geometry from backend visualization data contract
+ * - No frontend circularOrbit() or TLE propagation
+ * - Coordinate frame: TEME, Units: km
+ * - Post-maneuver path only when evaluated coordinates exist
  */
-import React, { useMemo, useState } from 'react'
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react'
+import { OrbitalSceneWrapper } from './OrbitalScene'
+import { useWebGLSupport } from './OrbitalScene'
+import { SizeDisclosure } from './SpaceObject'
 
-function circularOrbitPoints(sma_km, inc_deg, raan_deg, n = 120) {
-  // SIMPLIFIED FOR PROTOTYPE: circular orbit, no J2, no time progression.
-  const inc  = (inc_deg  * Math.PI) / 180
-  const raan = (raan_deg * Math.PI) / 180
-  const pts  = { x: [], y: [], z: [] }
-  for (let i = 0; i <= n; i++) {
-    const nu = (2 * Math.PI * i) / n
-    const xp = sma_km * Math.cos(nu)
-    const yp = sma_km * Math.sin(nu)
-    pts.x.push(xp * Math.cos(raan) - yp * Math.cos(inc) * Math.sin(raan))
-    pts.y.push(xp * Math.sin(raan) + yp * Math.cos(inc) * Math.cos(raan))
-    pts.z.push(yp * Math.sin(inc))
-  }
-  return pts
+// ─── Legend Button Subcomponent ──────────────────────────────────────────────
+function LegendBtn({
+  role,
+  active,
+  pinned,
+  onHover,
+  onUnhover,
+  onClick,
+  lineStyle,
+  label,
+  dashStyle,
+  isMarker,
+  markerColor,
+}) {
+  return (
+    <button
+      className={`legend-btn ${active ? 'legend-btn-active' : ''} ${pinned ? 'legend-btn-pinned' : ''}`}
+      aria-pressed={pinned}
+      aria-label={`${label} trajectory${pinned ? ' — pinned' : ''}`}
+      onMouseEnter={() => onHover(role)}
+      onMouseLeave={onUnhover}
+      onClick={() => onClick(role)}
+      onFocus={() => onHover(role)}
+      onBlur={onUnhover}
+    >
+      {isMarker ? (
+        <span className="legend-diamond" style={{ background: markerColor }} aria-hidden="true" />
+      ) : (
+        <span
+          className="legend-line"
+          style={lineStyle}
+          aria-hidden="true"
+          title={dashStyle ? 'Dashed line (threat)' : 'Solid line'}
+        />
+      )}
+      <span>{label}</span>
+      {pinned && <span className="legend-pin-dot" aria-hidden="true">●</span>}
+    </button>
+  )
 }
 
-function earthSphere(r = 6371) {
-  const N = 30
-  const x = [], y = [], z = []
-  for (let i = 0; i <= N; i++) {
-    const phi = (Math.PI * i) / N
-    for (let j = 0; j <= N; j++) {
-      const theta = (2 * Math.PI * j) / N
-      x.push(r * Math.sin(phi) * Math.cos(theta))
-      y.push(r * Math.sin(phi) * Math.sin(theta))
-      z.push(r * Math.cos(phi))
+// ─── Accessible Description ──────────────────────────────────────────────────
+function AccessibleDescription({ analysis, selectedCandidate, activeRole }) {
+  const desc = useMemo(() => {
+    if (!analysis) return 'No trajectory data. Select a scenario and run analysis.'
+    const parts = [
+      'Orbital visualization: protected satellite (cyan solid line) and threat object (red dashed line) in LEO.',
+      analysis.tca_offset_seconds != null
+        ? `TCA at ${(analysis.tca_offset_seconds / 60).toFixed(1)} min from epoch.`
+        : '',
+      analysis.nominal_miss_distance_km != null
+        ? `Miss distance: ${analysis.nominal_miss_distance_km.toFixed(4)} km.`
+        : '',
+      selectedCandidate
+        ? `Post-maneuver path (green solid line) shown for ${selectedCandidate.label}.`
+        : '',
+      activeRole === 'protected' ? 'Protected trajectory selected.' : '',
+      activeRole === 'threat' ? 'Threat trajectory selected.' : '',
+      activeRole === 'post' ? 'Post-maneuver trajectory selected.' : '',
+      activeRole === 'tca' ? 'Closest approach selected.' : '',
+      'Backend SGP4 propagation — not a frontend approximation.',
+    ]
+    return parts.filter(Boolean).join(' ')
+  }, [analysis, selectedCandidate, activeRole])
+
+  return <p className="sr-only" aria-live="polite">{desc}</p>
+}
+
+// ─── Status Bar ──────────────────────────────────────────────────────────────
+function TrajStatus({ pinnedRole, label }) {
+  if (!pinnedRole) return null
+  return (
+    <div className="traj-status" role="status" aria-live="polite">
+      {label}
+      <span className="traj-status-hint">· Click again or press Esc to unpin</span>
+    </div>
+  )
+}
+
+// ─── Keyboard Controls (Outside Canvas) ──────────────────────────────────────
+function KeyboardControls({
+  pinned,
+  selectedCandidate,
+  focusOur,
+  focusThr,
+  focusTCA,
+  focusPost,
+  clearSel,
+}) {
+  return (
+    <div className="traj-kbd-controls" role="group" aria-label="Trajectory keyboard controls">
+      <button
+        className={`traj-kbd-btn ${pinned === 'protected' ? 'active' : ''}`}
+        onClick={focusOur}
+        aria-pressed={pinned === 'protected'}
+        title="Focus protected satellite trajectory"
+      >
+        Protected
+      </button>
+      <button
+        className={`traj-kbd-btn ${pinned === 'threat' ? 'active' : ''}`}
+        onClick={focusThr}
+        aria-pressed={pinned === 'threat'}
+        title="Focus threat trajectory"
+      >
+        Threat
+      </button>
+      <button
+        className={`traj-kbd-btn ${pinned === 'tca' ? 'active' : ''}`}
+        onClick={focusTCA}
+        aria-pressed={pinned === 'tca'}
+        title="Focus closest approach"
+      >
+        TCA
+      </button>
+      {selectedCandidate && (
+        <button
+          className={`traj-kbd-btn ${pinned === 'post' ? 'active' : ''}`}
+          onClick={focusPost}
+          aria-pressed={pinned === 'post'}
+          title="Focus post-maneuver trajectory"
+        >
+          Maneuver
+        </button>
+      )}
+      {pinned && (
+        <button
+          className="traj-kbd-btn traj-kbd-clear"
+          onClick={clearSel}
+          title="Clear selection (Escape)"
+        >
+          ✕ Clear
+        </button>
+      )}
+    </div>
+  )
+}
+
+// ─── Main TrajectoryPlot Component ───────────────────────────────────────────
+export default function TrajectoryPlot({ analysis, selectedCandidate, loading }) {
+  const webglSupported = useWebGLSupport()
+  const [focus, setFocus] = useState(null)       // 'protected'|'threat'|'post'|'tca'|null
+  const [pinned, setPinned] = useState(null)     // same
+  const [cameraMode, setCameraMode] = useState('global') // 'global'|'tca'|'protected'|'threat'
+  const [vizError, setVizError] = useState(null)
+
+  const activeRole = pinned ?? focus
+  const isPinned = !!pinned
+
+  // Extract visualization data from analysis response
+  const visualization = useMemo(() => analysis?.visualization ?? null, [analysis])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    function onKey(e) {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return
+      if (e.key === 'Escape') setPinned(null)
     }
-  }
-  return { x, y, z }
-}
-
-export default function TrajectoryPlot({ analysis, selectedCandidate }) {
-  const [PlotComponent, setPlotComponent] = React.useState(null)
-  const [cameraRevision, setCameraRevision] = useState(0)
-
-  React.useEffect(() => {
-    import('react-plotly.js').then(m => setPlotComponent(() => m.default))
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
   }, [])
 
-  const traces = useMemo(() => {
-    if (!analysis) return []
+  // Pin status label
+  const pinnedLabel = pinned === 'protected' ? 'Protected trajectory selected'
+    : pinned === 'threat' ? 'Threat trajectory selected'
+    : pinned === 'post' ? 'Post-maneuver trajectory selected'
+    : pinned === 'tca' ? 'Closest approach selected'
+    : ''
 
-    const ourInc     = 51.640
-    const threatInc  = 51.641
-    const ourRaan    = 208.51
-    const threatRaan = 208.505
-    const ourSMA     = 6778   // ~400 km altitude LEO
-    const threatSMA  = 6775
+  // Legend handlers
+  const handleLegendHover = useCallback((role) => setFocus(role), [])
+  const handleLegendUnhover = useCallback(() => setFocus(null), [])
+  const handleLegendClick = useCallback((role) => {
+    setPinned(prev => (prev === role ? null : role))
+  }, [])
 
-    const ourPath    = circularOrbitPoints(ourSMA,    ourInc,    ourRaan)
-    const threatPath = circularOrbitPoints(threatSMA, threatInc, threatRaan)
+  // Camera view handlers
+  const focusTCA = useCallback(() => {
+    setCameraMode('tca')
+    setPinned('tca')
+    setFocus(null)
+  }, [])
 
-    // Post-maneuver path: shift SMA based on delta-v
-    // SIMPLIFIED FOR PROTOTYPE: delta SMA is approximate, not integrated
-    const dv      = selectedCandidate?.delta_v_ms ?? 0
-    const dSMA    = dv * 0.2  // rough km shift per m/s prograde
-    const postPath = circularOrbitPoints(ourSMA + dSMA, ourInc, ourRaan)
+  const resetView = useCallback(() => {
+    setCameraMode('global')
+    setPinned(null)
+    setFocus(null)
+  }, [])
 
-    // TCA marker: approximate position at TCA offset
-    const tcaFrac  = (analysis.tca_offset_seconds ?? 0) / 5760  // ~96-min orbit
-    const tcaAngle = 2 * Math.PI * tcaFrac
-    const tcaX     = ourSMA * Math.cos(tcaAngle)
-    const tcaY     = ourSMA * Math.sin(tcaAngle) * Math.cos((ourInc * Math.PI) / 180)
-    const tcaZ     = ourSMA * Math.sin(tcaAngle) * Math.sin((ourInc * Math.PI) / 180)
+  const focusOur = useCallback(() => { setPinned('protected'); setFocus(null) }, [])
+  const focusThr = useCallback(() => { setPinned('threat'); setFocus(null) }, [])
+  const focusTCA_ = useCallback(() => { setPinned('tca'); setFocus(null) }, [])
+  const focusPost = useCallback(() => { if (selectedCandidate) { setPinned('post'); setFocus(null) } }, [selectedCandidate])
+  const clearSel = useCallback(() => setPinned(null), [])
 
-    const earth = earthSphere(6371)
+  // Emphasis handlers for 3D scene
+  const handleEmphasisChange = useCallback((role) => setFocus(role), [])
+  const handlePinChange = useCallback((role) => {
+    setPinned(prev => (prev === role ? null : role))
+  }, [])
 
-    return [
-      // Earth surface
-      {
-        type: 'surface', opacity: 0.30, showscale: false, hoverinfo: 'skip',
-        x: earth.x, y: earth.y, z: earth.z,
-        colorscale: [[0, '#0d1e38'], [1, '#1a3a6a']],
-        name: 'Earth (approximate)',
-      },
-      // Our satellite orbit (original)
-      {
-        type: 'scatter3d', mode: 'lines', name: 'Protected Satellite',
-        x: ourPath.x, y: ourPath.y, z: ourPath.z,
-        line: { color: '#4589ff', width: 2 },
-      },
-      // Threat object orbit
-      {
-        type: 'scatter3d', mode: 'lines', name: 'Threat Object',
-        x: threatPath.x, y: threatPath.y, z: threatPath.z,
-        line: { color: '#ff7e7e', width: 2, dash: 'dash' },
-      },
-      // Post-maneuver orbit (only if candidate selected)
-      ...(selectedCandidate ? [{
-        type: 'scatter3d', mode: 'lines', name: 'Post-Maneuver Path',
-        x: postPath.x, y: postPath.y, z: postPath.z,
-        line: { color: '#52c07a', width: 2 },
-      }] : []),
-      // TCA marker
-      {
-        type: 'scatter3d', mode: 'markers+text',
-        name: 'Closest Approach (TCA)',
-        x: [tcaX], y: [tcaY], z: [tcaZ],
-        text: ['TCA'],
-        textposition: 'top center',
-        textfont: { color: '#f0c040', size: 9 },
-        marker: { size: 8, color: '#f0c040', symbol: 'diamond' },
-      },
-    ]
-  }, [analysis, selectedCandidate])
-
-  // Accessible text summary of the visualization
-  const a11ySummary = analysis
-    ? [
-        `Trajectory visualization: protected satellite (blue) and threat object (red dashed)`,
-        `in low Earth orbit (~${6778 - 6371} km altitude).`,
-        `Closest approach (TCA) marker shown in yellow.`,
-        analysis.tca_offset_seconds != null
-          ? `TCA at ${(analysis.tca_offset_seconds / 60).toFixed(1)} min from epoch.`
-          : '',
-        analysis.nominal_miss_distance_km != null
-          ? `Miss distance: ${analysis.nominal_miss_distance_km.toFixed(4)} km.`
-          : '',
-        selectedCandidate
-          ? `Post-maneuver path (green) shown for ${selectedCandidate.label}.`
-          : '',
-        'SIMPLIFIED: circular orbit approximation. Not a real ephemeris.',
-      ].filter(Boolean).join(' ')
-    : 'No trajectory data available. Run analysis to view.'
-
-  if (!PlotComponent) {
+  // Loading state
+  if (loading) {
     return (
-      <div className="state-box" style={{ height: 340 }} aria-live="polite">
-        <span className="spinner" aria-hidden="true" /> Loading 3D view…
+      <div className="viz-panel" aria-labelledby="viz-title">
+        <div className="viz-toolbar">
+          <span className="viz-title" id="viz-title">Orbital Trajectories — Closest Approach</span>
+        </div>
+        <div className="viz-empty" style={{ height: 560 }}>
+          <span className="spinner" aria-hidden="true" />
+          <span>Computing trajectories…</span>
+        </div>
       </div>
     )
   }
 
+  // No analysis data
   if (!analysis) {
     return (
-      <div className="state-box" style={{ height: 280 }}>
-        Run analysis to view trajectory.
+      <div className="viz-panel" aria-labelledby="viz-title">
+        <div className="viz-toolbar">
+          <span className="viz-title" id="viz-title">Orbital Trajectories — Closest Approach</span>
+        </div>
+        <div className="viz-empty" style={{ height: 560 }}>
+          <span style={{ fontSize: 32, opacity: 0.3 }}>◎</span>
+          <span>Select a scenario and run analysis to view orbital trajectories.</span>
+        </div>
+      </div>
+    )
+  }
+
+  // WebGL not supported
+  if (!webglSupported) {
+    return (
+      <div className="viz-panel" aria-labelledby="viz-title" role="alert">
+        <div className="viz-toolbar">
+          <span className="viz-title" id="viz-title">Orbital Trajectories — Closest Approach</span>
+        </div>
+        <div className="viz-empty" style={{ height: 560, padding: 24, textAlign: 'center' }}>
+          <h3>WebGL Not Available</h3>
+          <p>This visualization requires WebGL support.</p>
+          <p className="error-fallback">
+            Please enable hardware acceleration in your browser settings,
+            or use a browser with WebGL support.
+          </p>
+          <AccessibleDescription analysis={analysis} selectedCandidate={selectedCandidate} activeRole={activeRole} />
+        </div>
+      </div>
+    )
+  }
+
+  // Visualization data not available (backend contract not fulfilled)
+  if (!visualization) {
+    return (
+      <div className="viz-panel" aria-labelledby="viz-title" role="alert">
+        <div className="viz-toolbar">
+          <span className="viz-title" id="viz-title">Orbital Trajectories — Closest Approach</span>
+        </div>
+        <div className="viz-empty" style={{ height: 560, padding: 24, textAlign: 'center' }}>
+          <h3>Visualization Data Unavailable</h3>
+          <p>The backend did not return trajectory visualization data.</p>
+          <p className="error-fallback">
+            This may indicate a backend version mismatch. Please re-run analysis.
+          </p>
+          <AccessibleDescription analysis={analysis} selectedCandidate={selectedCandidate} activeRole={activeRole} />
+        </div>
       </div>
     )
   }
 
   return (
-    <div>
-      {/* Plot controls */}
-      <div className="plot-controls">
-        <span className="plot-disclaimer" aria-label="Visualization disclaimer">
-          SIMPLIFIED FOR PROTOTYPE: Orbits shown as approximate circular paths.
-          Not a real ephemeris. SGP4 is used for all physics in the backend.
-        </span>
-        <button
-          className="btn btn-ghost btn-sm"
-          onClick={() => setCameraRevision(r => r + 1)}
-          aria-label="Reset 3D view to default camera angle"
-        >
-          Reset View
-        </button>
+    <div className="viz-panel" aria-labelledby="viz-title">
+      {/* ── Toolbar ──────────────────────────────────────────────── */}
+      <div className="viz-toolbar">
+        <span className="viz-title" id="viz-title">Orbital Trajectories — Closest Approach</span>
+
+        {/* ── Interactive Legend ───────────────────────────────── */}
+        <div className="viz-legend" role="group" aria-label="Trajectory legend — click to pin">
+          <LegendBtn
+            role="protected"
+            active={activeRole === 'protected'}
+            pinned={pinned === 'protected'}
+            onHover={handleLegendHover}
+            onUnhover={handleLegendUnhover}
+            onClick={handleLegendClick}
+            lineStyle={{ background: '#33b1ff' }}
+            label="Protected Sat"
+            dashStyle={false}
+          />
+          <LegendBtn
+            role="threat"
+            active={activeRole === 'threat'}
+            pinned={pinned === 'threat'}
+            onHover={handleLegendHover}
+            onUnhover={handleLegendUnhover}
+            onClick={handleLegendClick}
+            lineStyle={{ background: `repeating-linear-gradient(90deg, #fa4d56 0, #fa4d56 4px, transparent 4px, transparent 7px)` }}
+            label="Threat Object"
+            dashStyle={true}
+          />
+          {selectedCandidate && (
+            <LegendBtn
+              role="post"
+              active={activeRole === 'post'}
+              pinned={pinned === 'post'}
+              onHover={handleLegendHover}
+              onUnhover={handleLegendUnhover}
+              onClick={handleLegendClick}
+              lineStyle={{ background: '#42be65' }}
+              label="Post-Maneuver"
+              dashStyle={false}
+            />
+          )}
+          <LegendBtn
+            role="tca"
+            active={activeRole === 'tca'}
+            pinned={pinned === 'tca'}
+            onHover={handleLegendHover}
+            onUnhover={handleLegendUnhover}
+            onClick={handleLegendClick}
+            isMarker={true}
+            markerColor="#f1c21b"
+            label="TCA"
+          />
+        </div>
+
+        {/* ── Toolbar Actions ──────────────────────────────────── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span className="viz-schematic-chip" aria-label="Backend-derived visualization — accurate to scale">
+            Backend SGP4 · TEME Frame · To Scale
+          </span>
+          {cameraMode === 'tca' ? (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={resetView}
+              aria-label="Return to global orbital view"
+            >
+              ↩ Global View
+            </button>
+          ) : (
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={focusTCA}
+              aria-label="Focus camera on closest approach region"
+              title="Focus Closest Approach"
+            >
+              ⊙ Focus TCA
+            </button>
+          )}
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={resetView}
+            aria-label="Reset 3D camera to default angle and clear selection"
+          >
+            Reset View
+          </button>
+        </div>
       </div>
 
-      {/* 3D plot */}
-      <PlotComponent
-        key={cameraRevision}
-        data={traces}
-        layout={{
-          paper_bgcolor: 'transparent',
-          plot_bgcolor:  'transparent',
-          margin: { l: 0, r: 0, t: 0, b: 0 },
-          height: 360,
-          legend: {
-            font:        { color: '#a8bccf', size: 10 },
-            bgcolor:     'rgba(15,28,46,0.85)',
-            bordercolor: '#243347',
-            borderwidth: 1,
-          },
-          scene: {
-            bgcolor: '#060e1a',
-            xaxis: { showgrid: false, zeroline: false, showticklabels: false, title: '' },
-            yaxis: { showgrid: false, zeroline: false, showticklabels: false, title: '' },
-            zaxis: { showgrid: false, zeroline: false, showticklabels: false, title: '' },
-            camera: { eye: { x: 1.5, y: 1.5, z: 0.9 } },
-          },
-        }}
-        config={{ displayModeBar: false, responsive: true }}
-        style={{ width: '100%' }}
-        aria-hidden="true"
+      {/* ── Keyboard Controls (Outside Canvas) ───────────────── */}
+      <KeyboardControls
+        pinned={pinned}
+        selectedCandidate={selectedCandidate}
+        focusOur={focusOur}
+        focusThr={focusThr}
+        focusTCA={focusTCA_}
+        focusPost={focusPost}
+        clearSel={clearSel}
       />
 
-      {/* Accessible text alternative */}
-      <div
-        className="plot-a11y-summary"
-        aria-label="Text description of the trajectory visualization"
-        role="note"
-      >
-        <strong>Text summary:</strong> {a11ySummary}
+      {/* ── Status Bar ──────────────────────────────────────────── */}
+      <TrajStatus pinnedRole={pinned} label={pinnedLabel} />
+
+      {/* ── Accessible Description ─────────────────────────────── */}
+      <AccessibleDescription analysis={analysis} selectedCandidate={selectedCandidate} activeRole={activeRole} />
+
+      {/* ── 3D Orbital Scene ───────────────────────────────────── */}
+      <div className="viz-body">
+        <OrbitalSceneWrapper
+          visualization={visualization}
+          analysis={analysis}
+          selectedCandidate={selectedCandidate}
+          emphasizedRole={focus}
+          pinnedRole={pinned}
+          onEmphasisChange={handleEmphasisChange}
+          onPinChange={handlePinChange}
+          cameraMode={cameraMode}
+          onCameraModeChange={setCameraMode}
+          loading={false}
+          error={vizError}
+          style={{ width: '100%', height: '100%' }}
+        />
       </div>
     </div>
   )

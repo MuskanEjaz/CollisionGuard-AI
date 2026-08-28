@@ -1,8 +1,12 @@
-# Analysis endpoint -- Phase 7.
+# Analysis endpoint -- Phase 7/9.
 # POST /scenarios/{scenario_id}/analyse
 #
 # Returns the full FullAnalysisResponse: propagation + evaluation + Granite
 # advisory in one call, with in-memory caching to avoid ~20s re-computation.
+#
+# Phase 9: all routes use resolve_scenario() (supports both committed JSON
+# and runtime CelesTrak live scenarios). Relative velocity, covariance
+# contract, and proper 410-expiry handling added.
 #
 # Cache behaviour:
 #   - Hit: returns cached result with cached=True, no recomputation.
@@ -17,14 +21,14 @@ from fastapi import APIRouter, HTTPException
 from schemas.analysis import (
     FullAnalysisResponse, RiskClassification, DataQualityNote,
     ApprovalRequest, ExecutionApprovedResponse, ExecutionStatus,
-    IncidentReport,
+    IncidentReport, VisualizationData, VisualizationSample, VisualizationTCA,
 )
 from schemas.maneuver import EvaluationResponse
 from granite_client import get_granite_advisory
 from maneuver_candidates import get_maneuver_candidates
 from maneuver_evaluator import evaluate_all_candidates
 from propagation import propagate_scenario, CONJUNCTION_THRESHOLD_KM
-from routers.scenarios import _load_scenarios
+from scenario_registry import resolve_scenario
 from analysis_cache import get_cached, set_cached, invalidate, cache_stats
 
 router = APIRouter(tags=["analysis"])
@@ -59,13 +63,11 @@ def _classify_risk(miss_km: float) -> RiskClassification:
 
 
 def _build_analysis(scenario_id: str) -> FullAnalysisResponse:
-    # Full pipeline: propagate -> evaluate -> advise (Granite or fallback).
-    # Called only on cache miss.
-    scenarios = _load_scenarios()
-    if scenario_id not in scenarios:
-        raise HTTPException(status_code=404,
-                            detail=f"Scenario '{scenario_id}' not found.")
-    scenario = scenarios[scenario_id]
+    """Full pipeline for committed synthetic scenarios.
+    Called only on cache miss.  Uses resolve_scenario() which supports
+    both committed JSON and registered runtime scenarios.
+    """
+    scenario = resolve_scenario(scenario_id)    # raises 404/410 if not found/expired
 
     try:
         prop = propagate_scenario(scenario)
@@ -89,13 +91,44 @@ def _build_analysis(scenario_id: str) -> FullAnalysisResponse:
         total_count=len(evaluated),
         evaluation_note=(
             "SIMPLIFIED FOR PROTOTYPE: post-maneuver miss distance is estimated "
-            "by two-body state-vector perturbation, not optimal targeting."
+            "by SGP4 state-vector propagation in the TEME frame, not optimal targeting."
         ),
     )
 
     advisory = get_granite_advisory(evaluation)
 
     epoch_str = scenario.epoch_utc.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    # Build visualization data from propagation results
+    viz_data = None
+    if prop.visualization_samples and prop.visualization_tca:
+        samples = [
+            VisualizationSample(
+                timestamp_utc=s.timestamp_utc.isoformat(),
+                protected_position_km=list(s.protected_position_km),
+                threat_position_km=list(s.threat_position_km),
+            )
+            for s in prop.visualization_samples
+        ]
+        tca = VisualizationTCA(
+            timestamp_utc=prop.visualization_tca["timestamp_utc"],
+            protected_position_km=prop.visualization_tca["protected_position_km"],
+            threat_position_km=prop.visualization_tca["threat_position_km"],
+            miss_distance_km=prop.visualization_tca["miss_distance_km"],
+            relative_velocity_km_s=prop.visualization_tca.get("relative_velocity_km_s"),
+            relative_velocity_vector_km_s=prop.visualization_tca.get("relative_velocity_vector_km_s"),
+            coordinate_frame=prop.visualization_tca.get("coordinate_frame", "TEME"),
+        )
+        viz_data = VisualizationData(
+            coordinate_frame=prop.visualization_frame,
+            position_units=prop.visualization_units,
+            visualization_start_utc=samples[0].timestamp_utc if samples else prop.tca_utc.isoformat(),
+            visualization_end_utc=samples[-1].timestamp_utc if samples else prop.tca_utc.isoformat(),
+            samples=samples,
+            tca=tca,
+            post_maneuver=None,  # Will be populated when a candidate is selected
+        )
+
     return FullAnalysisResponse(
         scenario_id=scenario_id,
         cached=False,
@@ -105,6 +138,17 @@ def _build_analysis(scenario_id: str) -> FullAnalysisResponse:
         tca_utc=prop.tca_utc,
         is_conjunction=prop.is_conjunction,
         conjunction_threshold_km=CONJUNCTION_THRESHOLD_KM,
+        relative_velocity_km_s=prop.relative_velocity_km_s,
+        relative_velocity_vector_km_s=prop.relative_velocity_vector_km_s,
+        relative_velocity_frame=prop.relative_velocity_frame,
+        relative_velocity_timestamp_utc=prop.tca_utc,
+        relative_velocity_basis=prop.relative_velocity_basis,
+        # Synthetic scenario covariance contract
+        covariance_available=True,
+        covariance_source="Synthetic covariance",
+        covariance_basis="Committed demonstration uncertainty model",
+        collision_probability_available=True,
+        collision_probability=None,   # not computed numerically in this prototype
         risk=_classify_risk(prop.miss_distance_km),
         data_quality=[
             DataQualityNote(
@@ -121,8 +165,9 @@ def _build_analysis(scenario_id: str) -> FullAnalysisResponse:
             DataQualityNote(
                 field="Miss distance",
                 note=(
-                    "Two-body propagation in TEME frame. "
-                    "J2, drag, and solar-pressure perturbations not modelled."
+                    "SGP4 propagation in TEME frame. "
+                    "Results are screening-level; element age and model simplifications "
+                    "limit accuracy."
                 ),
             ),
         ],
@@ -132,6 +177,12 @@ def _build_analysis(scenario_id: str) -> FullAnalysisResponse:
         total_count=len(evaluated),
         evaluation_note=evaluation.evaluation_note,
         advisory=advisory,
+        risk_basis_label=(
+            "SGP4 propagation in the TEME frame using public CelesTrak GP elements. "
+            "Results remain screening-level because public GP data does not include "
+            "operational conjunction covariance and accuracy degrades with element age."
+        ),
+        visualization=viz_data,
     )
 
 
@@ -142,16 +193,11 @@ def _build_analysis(scenario_id: str) -> FullAnalysisResponse:
 @router.post("/scenarios/{scenario_id}/analyse",
              response_model=FullAnalysisResponse)
 def analyse(scenario_id: str) -> FullAnalysisResponse:
-    # Check cache first
-    scenarios = _load_scenarios()
-    if scenario_id not in scenarios:
-        raise HTTPException(status_code=404,
-                            detail=f"Scenario '{scenario_id}' not found.")
-    scenario = scenarios[scenario_id]
+    # resolve_scenario raises 404 (not found) or 410 (expired live scenario)
+    scenario = resolve_scenario(scenario_id)
 
     cached_result, hit = get_cached(scenario_id, scenario)
     if hit:
-        # Return cached copy with cached=True flag
         cached_result.cached = True
         return cached_result
 
@@ -179,18 +225,13 @@ def get_cache_stats() -> dict:
              response_model=ExecutionApprovedResponse)
 def approve_execution(scenario_id: str, body: ApprovalRequest) -> ExecutionApprovedResponse:
     # SAFETY GATE: validate the candidate is safe before recording approval.
-    # This endpoint only records intent -- simulated execution is in /execute.
     if body.scenario_id != scenario_id:
         raise HTTPException(status_code=422,
                             detail="scenario_id in URL and body must match.")
 
-    scenarios = _load_scenarios()
-    if scenario_id not in scenarios:
-        raise HTTPException(status_code=404,
-                            detail=f"Scenario '{scenario_id}' not found.")
-    scenario = scenarios[scenario_id]
+    # resolve_scenario supports both committed and runtime live scenarios
+    scenario = resolve_scenario(scenario_id)   # 404/410 if not found/expired
 
-    # Re-evaluate to confirm the candidate is still safe (never trust the UI)
     candidates = {c.candidate_id: c for c in get_maneuver_candidates()}
     if body.candidate_id not in candidates:
         raise HTTPException(status_code=404,
@@ -198,10 +239,9 @@ def approve_execution(scenario_id: str, body: ApprovalRequest) -> ExecutionAppro
 
     cached_result, _ = get_cached(scenario_id, scenario)
     if cached_result:
-        # Find candidate in cached evaluation
         cand_map = {c.candidate_id: c for c in cached_result.candidates}
     else:
-        # Re-evaluate (fallback if cache expired)
+        # Re-evaluate on cache miss
         try:
             prop = propagate_scenario(scenario)
         except Exception as exc:
@@ -216,7 +256,6 @@ def approve_execution(scenario_id: str, body: ApprovalRequest) -> ExecutionAppro
         raise HTTPException(status_code=404,
                             detail=f"Candidate '{body.candidate_id}' not found in evaluation.")
 
-    # SAFETY GATE: unsafe candidates are rejected here, not at the UI level
     if not candidate.is_safe:
         return ExecutionApprovedResponse(
             execution=ExecutionStatus(
@@ -233,7 +272,6 @@ def approve_execution(scenario_id: str, body: ApprovalRequest) -> ExecutionAppro
             rejection_reason=candidate.safety_rejection_reason,
         )
 
-    # Record pending approval
     _PENDING_APPROVALS[scenario_id] = body.candidate_id
 
     return ExecutionApprovedResponse(
@@ -254,7 +292,7 @@ def approve_execution(scenario_id: str, body: ApprovalRequest) -> ExecutionAppro
 @router.post("/scenarios/{scenario_id}/execute",
              response_model=ExecutionStatus)
 def execute(scenario_id: str, body: ApprovalRequest) -> ExecutionStatus:
-    # SAFETY GATE: only execute if an approval is pending for this exact candidate.
+    # SAFETY GATE: only execute if an approval is pending.
     if _PENDING_APPROVALS.get(scenario_id) != body.candidate_id:
         raise HTTPException(
             status_code=403,
@@ -264,14 +302,9 @@ def execute(scenario_id: str, body: ApprovalRequest) -> ExecutionStatus:
             ),
         )
 
-    # Clear the pending approval (one-use)
     del _PENDING_APPROVALS[scenario_id]
 
-    scenarios = _load_scenarios()
-    scenario = scenarios.get(scenario_id)
-    if scenario is None:
-        raise HTTPException(status_code=404,
-                            detail=f"Scenario '{scenario_id}' not found.")
+    scenario = resolve_scenario(scenario_id)   # 404/410 if not found/expired
 
     candidates = {c.candidate_id: c for c in get_maneuver_candidates()}
     candidate = candidates.get(body.candidate_id)
@@ -279,7 +312,6 @@ def execute(scenario_id: str, body: ApprovalRequest) -> ExecutionStatus:
         raise HTTPException(status_code=404,
                             detail=f"Candidate '{body.candidate_id}' not found.")
 
-    # Final safety check -- belt-and-suspenders
     cached_result, _ = get_cached(scenario_id, scenario)
     if cached_result:
         cand_map = {c.candidate_id: c for c in cached_result.candidates}
@@ -293,8 +325,6 @@ def execute(scenario_id: str, body: ApprovalRequest) -> ExecutionStatus:
             detail=f"Safety gate: candidate '{body.candidate_id}' is not safe.",
         )
 
-    # Simulated execution: report what the maneuver would produce
-    # Values come from the backend-evaluated candidate, never from the UI
     return ExecutionStatus(
         scenario_id=scenario_id,
         candidate_id=body.candidate_id,
@@ -316,17 +346,12 @@ def execute(scenario_id: str, body: ApprovalRequest) -> ExecutionStatus:
 @router.post("/scenarios/{scenario_id}/incident-report",
              response_model=IncidentReport)
 def incident_report(scenario_id: str, body: ApprovalRequest) -> IncidentReport:
-    # Generate an incident report using Granite if available, else template.
-    scenarios = _load_scenarios()
-    if scenario_id not in scenarios:
-        raise HTTPException(status_code=404,
-                            detail=f"Scenario '{scenario_id}' not found.")
+    scenario = resolve_scenario(scenario_id)   # 404/410 if not found/expired
 
-    cached_result, _ = get_cached(scenario_id, scenarios[scenario_id])
+    cached_result, _ = get_cached(scenario_id, scenario)
     advisory_source = "deterministic_template"
     report_text = _deterministic_report(scenario_id, body.candidate_id, cached_result)
 
-    # If Granite was used for the advisory, attempt a Granite-generated report
     if cached_result and cached_result.advisory.source == "granite":
         granite_text = _try_granite_report(scenario_id, body.candidate_id, cached_result)
         if granite_text:
@@ -358,12 +383,18 @@ def _deterministic_report(scenario_id: str, candidate_id: str, analysis) -> str:
         f"post-maneuver miss {cand.post_maneuver_miss_distance_km:.3f} km, "
         f"fuel {cand.fuel_cost_kg:.4f} kg"
     ) if cand else f"Candidate {candidate_id}: details unavailable"
+    rel_vel_str = (
+        f"Relative velocity at TCA: {analysis.relative_velocity_km_s:.4f} km/s"
+        if analysis.relative_velocity_km_s is not None
+        else "Relative velocity: Not available"
+    )
     return (
         f"SIMULATED INCIDENT REPORT\n"
         f"================================\n"
         f"Scenario          : {scenario_id}\n"
         f"Risk level        : {analysis.risk.level}\n"
         f"Nominal miss dist : {analysis.nominal_miss_distance_km:.4f} km\n"
+        f"{rel_vel_str}\n"
         f"TCA               : {analysis.tca_utc.strftime('%Y-%m-%dT%H:%M:%SZ')}\n"
         f"Selected maneuver : {cand_str}\n"
         f"Advisory source   : {analysis.advisory.source}\n"
@@ -376,9 +407,7 @@ def _deterministic_report(scenario_id: str, candidate_id: str, analysis) -> str:
 
 
 def _try_granite_report(scenario_id: str, candidate_id: str, analysis) -> str | None:
-    # Attempt to generate a Granite narrative for the incident report.
-    # Returns None on any failure -- caller falls back to deterministic template.
-    from granite_client import _has_valid_config, _call_granite
+    from granite_client import _has_valid_config
     valid, _ = _has_valid_config()
     if not valid:
         return None

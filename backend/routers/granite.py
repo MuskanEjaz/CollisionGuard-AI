@@ -14,7 +14,7 @@ from granite_client import get_granite_advisory
 from maneuver_candidates import get_maneuver_candidates
 from maneuver_evaluator import evaluate_all_candidates
 from propagation import propagate_scenario
-from routers.scenarios import _load_scenarios
+from scenario_registry import resolve_scenario
 from schemas.maneuver import EvaluationResponse
 
 router = APIRouter(prefix="/scenarios", tags=["granite"])
@@ -22,12 +22,8 @@ router = APIRouter(prefix="/scenarios", tags=["granite"])
 
 @router.post("/{scenario_id}/advise", response_model=GraniteAdvisoryResponse)
 def advise(scenario_id: str) -> GraniteAdvisoryResponse:
-    # Step 1: validate scenario exists
-    scenarios = _load_scenarios()
-    if scenario_id not in scenarios:
-        raise HTTPException(status_code=404,
-                            detail=f"Scenario '{scenario_id}' not found.")
-    scenario = scenarios[scenario_id]
+    # Step 1: validate scenario exists (committed or live runtime)
+    scenario = resolve_scenario(scenario_id)
 
     # Step 2: propagate
     try:

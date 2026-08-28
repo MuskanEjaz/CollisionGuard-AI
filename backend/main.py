@@ -18,6 +18,7 @@ from routers import maneuvers as maneuvers_router
 from routers import robustness as robustness_router
 from routers import granite as granite_router
 from routers import analysis as analysis_router
+from routers import celestrak as celestrak_router
 
 settings = get_settings()
 
@@ -34,9 +35,11 @@ app = FastAPI(
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
 # Allow the Vite dev server (and any configured override) to reach the API.
+# Support comma-separated origins in config
+cors_origins = [o.strip() for o in settings.cors_origin.split(',') if o.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.cors_origin],
+    allow_origins=cors_origins,
     allow_credentials=False,
     allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
@@ -49,3 +52,4 @@ app.include_router(maneuvers_router.router)
 app.include_router(robustness_router.router)
 app.include_router(granite_router.router)
 app.include_router(analysis_router.router)
+app.include_router(celestrak_router.router)

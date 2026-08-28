@@ -4,17 +4,15 @@ from schemas.maneuver import ManeuverCandidateListResponse, EvaluationResponse
 from maneuver_candidates import get_maneuver_candidates
 from maneuver_evaluator import evaluate_all_candidates
 from propagation import propagate_scenario
-from routers.scenarios import _load_scenarios
+from scenario_registry import resolve_scenario
 
 router = APIRouter(prefix="/scenarios", tags=["maneuvers"])
 
 
 @router.get("/{scenario_id}/maneuvers", response_model=ManeuverCandidateListResponse)
 def list_maneuver_candidates(scenario_id: str) -> ManeuverCandidateListResponse:
-    # Phase 3: return unevaluated candidates
-    if scenario_id not in _load_scenarios():
-        raise HTTPException(status_code=404,
-                            detail=f"Scenario '{scenario_id}' not found.")
+    # Phase 3: return unevaluated candidates for committed or live scenarios
+    resolve_scenario(scenario_id)
     candidates = get_maneuver_candidates()
     return ManeuverCandidateListResponse(
         scenario_id=scenario_id,
@@ -27,11 +25,7 @@ def list_maneuver_candidates(scenario_id: str) -> ManeuverCandidateListResponse:
 def evaluate_maneuvers(scenario_id: str) -> EvaluationResponse:
     # Phase 4: propagate scenario, then evaluate all candidates.
     # Only candidates marked is_safe=True may be passed to Granite (Phase 6).
-    scenarios = _load_scenarios()
-    if scenario_id not in scenarios:
-        raise HTTPException(status_code=404,
-                            detail=f"Scenario '{scenario_id}' not found.")
-    scenario = scenarios[scenario_id]
+    scenario = resolve_scenario(scenario_id)
 
     try:
         prop_result = propagate_scenario(scenario)
@@ -58,7 +52,7 @@ def evaluate_maneuvers(scenario_id: str) -> EvaluationResponse:
         total_count=len(evaluated),
         evaluation_note=(
             "SIMPLIFIED FOR PROTOTYPE: post-maneuver miss distance is estimated "
-            "by two-body state-vector perturbation, not optimal targeting. "
+            "by SGP4 state-vector propagation in the TEME frame, not optimal targeting. "
             "Baseline score uses linear weighting, not multi-objective optimisation."
         ),
     )
