@@ -73,10 +73,6 @@ function HealthPill() {
 }
 
 // ─── SCENARIO BUTTONS ────────────────────────────────────────────
-const SCENARIO_META = {
-  conjunction_scenario: { source: 'Synthetic TLE', quality: 'Screening-level' },
-  safe_scenario:        { source: 'Synthetic TLE', quality: 'Screening-level' },
-}
 
 function ScenarioGrid({ scenarios, selectedId, onSelect, disabled }) {
   if (!scenarios.length) return null
@@ -85,7 +81,6 @@ function ScenarioGrid({ scenarios, selectedId, onSelect, disabled }) {
       {scenarios.map(s => {
         const conj    = s.scenario_type === 'conjunction'
         const checked = selectedId === s.scenario_id
-        const meta    = SCENARIO_META[s.scenario_id] ?? {}
         return (
           <button
             key={s.scenario_id}
@@ -103,15 +98,23 @@ function ScenarioGrid({ scenarios, selectedId, onSelect, disabled }) {
             <div className="sb-meta">
               <div className="sb-meta-row">
                 <span>Source</span>
-                <span>{meta.source ?? 'Not provided'}</span>
+                <span>{s.data_source ?? 'Not provided'}</span>
               </div>
               <div className="sb-meta-row">
                 <span>Quality</span>
-                <span>{meta.quality ?? 'Not provided'}</span>
+                <span>{s.data_quality ?? 'Not provided'}</span>
+              </div>
+              <div className="sb-meta-row">
+                <span>Uncertainty basis</span>
+                <span>{s.uncertainty_basis ?? 'Not provided'}</span>
+              </div>
+              <div className="sb-meta-row">
+                <span>Operational use</span>
+                <span>{s.operational_use ?? 'Not provided'}</span>
               </div>
               {s.epoch_utc && (
                 <div className="sb-meta-row">
-                  <span>Epoch</span>
+                  <span>Synthetic scenario epoch</span>
                   <span style={{ fontFamily: 'var(--mono)' }}>{s.epoch_utc}</span>
                 </div>
               )}

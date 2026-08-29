@@ -63,9 +63,41 @@ export function OrbitalScene({
   const protectedPosition = latestSample?.protected_position_km ?? null
   const threatPosition = latestSample?.threat_position_km ?? null
 
-  // TCA positions
+  // TCA positions returned by the backend.
   const tcaProtectedPos = tcaData?.protected_position_km ?? null
   const tcaThreatPos = tcaData?.threat_position_km ?? null
+
+  // Global mode displays backend epoch positions at true scene scale.
+  const epochProtectedVisual = protectedPosition?.map(v => v * VISUAL_SCALE) ?? null
+  const epochThreatVisual = threatPosition?.map(v => v * VISUAL_SCALE) ?? null
+
+  let displayedProtectedPosition = epochProtectedVisual
+  let displayedThreatPosition = epochThreatVisual
+
+  // TCA mode preserves the backend midpoint and relative direction.
+  // Only microscopic separation is magnified for visual readability.
+  if (cameraMode === 'tca' && tcaProtectedPos && tcaThreatPos) {
+    const protectedTrue = new THREE.Vector3(...tcaProtectedPos).multiplyScalar(VISUAL_SCALE)
+    const threatTrue = new THREE.Vector3(...tcaThreatPos).multiplyScalar(VISUAL_SCALE)
+    const midpoint = protectedTrue.clone().add(threatTrue).multiplyScalar(0.5)
+    const relative = threatTrue.clone().sub(protectedTrue)
+    const trueSceneSeparation = relative.length()
+
+    const minimumVisibleSeparation = 0.9
+    const magnification = trueSceneSeparation > 0
+      ? Math.max(1, minimumVisibleSeparation / trueSceneSeparation)
+      : 1
+
+    const displayedHalfSeparation = relative.multiplyScalar(magnification * 0.5)
+
+    displayedProtectedPosition = midpoint.clone()
+      .sub(displayedHalfSeparation)
+      .toArray()
+
+    displayedThreatPosition = midpoint.clone()
+      .add(displayedHalfSeparation)
+      .toArray()
+  }
 
   // Sun direction (normalized)
   const sunDir = useMemo(() => new THREE.Vector3(...SCENE_CONFIG.sunDirection).normalize(), [])
@@ -202,10 +234,10 @@ export function OrbitalScene({
           )}
 
           {/* ── Space Objects ───────────────────────────────────────────── */}
-          {protectedPosition && (
+          {displayedProtectedPosition && (
             <ProtectedSatellite
-              position={protectedPosition.map(v => v * VISUAL_SCALE)}
-              scale={0.8}
+              position={displayedProtectedPosition}
+              scale={0.7}
               highlighted={protectedEmphasized}
               pinned={pinnedRole === 'protected'}
               onPointerOver={(e) => handleObjectPointerOver('protected', e)}
@@ -214,10 +246,10 @@ export function OrbitalScene({
             />
           )}
 
-          {threatPosition && (
+          {displayedThreatPosition && (
             <ThreatObject
-              position={threatPosition.map(v => v * VISUAL_SCALE)}
-              scale={0.6}
+              position={displayedThreatPosition}
+              scale={0.22}
               highlighted={threatEmphasized}
               pinned={pinnedRole === 'threat'}
               onPointerOver={(e) => handleObjectPointerOver('threat', e)}

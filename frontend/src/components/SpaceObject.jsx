@@ -30,151 +30,111 @@ export function ProtectedSatellite({
   onPointerOut,
   onClick,
 }) {
-  const meshRef = useReactThreeFiberRef()
   const groupRef = React.useRef(null)
+  const active = highlighted || pinned
 
-  // Subtle rotation for visual interest (solar panels facing sun)
   useFrame((state, delta) => {
     if (groupRef.current) {
-      groupRef.current.rotation.y += delta * 0.05
+      groupRef.current.rotation.y += delta * 0.08
     }
   })
-
-  // Emphasis colors
-  const baseColor = highlighted || pinned ? '#33b1ff' : '#66ccff'
-  const emissiveColor = highlighted || pinned ? '#33b1ff' : '#004466'
-  const emissiveIntensity = highlighted || pinned ? 0.4 : 0.15
 
   return (
     <group
       ref={groupRef}
       position={position}
-      scale={scale}
+      scale={scale * 0.32}
+      rotation={[0.18, 0.35, -0.12]}
       onPointerOver={onPointerOver}
       onPointerOut={onPointerOut}
       onClick={onClick}
       name="protected-satellite"
     >
-      {/* Invisible hit target for easier hovering (slightly larger than visual) */}
-      <mesh
-        visible={false}
-        geometry={useMemo(() => new THREE.BoxGeometry(4, 4, 4), [])}
-        material={useMemo(() => new THREE.MeshBasicMaterial({ visible: false }), [])}
-        onPointerOver={onPointerOver}
-        onPointerOut={onPointerOut}
-        onClick={onClick}
-        name="protected-satellite-hit"
-      />
-
-      {/* Central bus */}
-      <mesh
-        ref={meshRef}
-        geometry={useMemo(() => new THREE.BoxGeometry(1.2, 0.8, 1.0), [])}
-        material={useMemo(() => new THREE.MeshStandardMaterial({
-          color: baseColor,
-          emissive: emissiveColor,
-          emissiveIntensity,
-          metalness: 0.7,
-          roughness: 0.3,
-        }), [baseColor, emissiveColor, emissiveIntensity])}
-        castShadow
-        receiveShadow
-        name="satellite-bus"
-      >
-        <meshStandardMaterial attach="material" />
+      {/* Larger invisible target preserves reliable hover interaction. */}
+      <mesh visible={false} name="protected-satellite-hit">
+        <sphereGeometry args={[2.2, 12, 12]} />
+        <meshBasicMaterial visible={false} />
       </mesh>
 
-      {/* Solar panel +Y wing */}
-      <group position={[0, 0, 0]} name="solar-wing-positive-y">
-        <mesh
-          geometry={useMemo(() => new THREE.BoxGeometry(0.1, 3.5, 2.0), [])}
-          material={useMemo(() => new THREE.MeshStandardMaterial({
-            color: 0x1a1a2e,
-            emissive: highlighted || pinned ? '#0a2a4a' : '#000',
-            emissiveIntensity: highlighted || pinned ? 0.3 : 0.1,
-            metalness: 0.5,
-            roughness: 0.2,
-          }), [highlighted, pinned])}
-          castShadow
-          receiveShadow
-          position={[0, 2.0, 0]}
-          name="solar-panel-plus-y"
+      {/* Compact metallic spacecraft bus. */}
+      <mesh castShadow receiveShadow name="satellite-bus">
+        <boxGeometry args={[1.05, 0.72, 0.82]} />
+        <meshStandardMaterial
+          color={active ? '#7fdbff' : '#b8c7d9'}
+          emissive={active ? '#0d6b9c' : '#08283a'}
+          emissiveIntensity={active ? 0.55 : 0.2}
+          metalness={0.72}
+          roughness={0.3}
         />
-        {/* Panel detail lines */}
-        <mesh
-          geometry={useMemo(() => new THREE.BoxGeometry(0.12, 3.5, 0.15), [])}
-          material={useMemo(() => new THREE.MeshBasicMaterial({ color: 0x0a0a1a }), [])}
-          position={[0, 2.0, 0.9]}
+      </mesh>
+
+      {/* Gold thermal face gives the model a recognizable spacecraft body. */}
+      <mesh position={[0, 0, 0.416]} name="thermal-panel">
+        <boxGeometry args={[0.78, 0.48, 0.035]} />
+        <meshStandardMaterial
+          color="#c9952e"
+          emissive="#3a2605"
+          emissiveIntensity={0.18}
+          metalness={0.5}
+          roughness={0.34}
         />
-        <mesh
-          geometry={useMemo(() => new THREE.BoxGeometry(0.12, 3.5, 0.15), [])}
-          material={useMemo(() => new THREE.MeshBasicMaterial({ color: 0x0a0a1a }), [])}
-          position={[0, 2.0, -0.9]}
-        />
+      </mesh>
+
+      {/* Horizontal solar wings: compact and readable at global scale. */}
+      <group name="solar-array">
+        <mesh position={[1.18, 0, 0]} castShadow name="solar-panel-right">
+          <boxGeometry args={[1.25, 0.07, 0.7]} />
+          <meshStandardMaterial
+            color={active ? '#176fa8' : '#123e72'}
+            emissive={active ? '#0a5d91' : '#03172d'}
+            emissiveIntensity={active ? 0.4 : 0.18}
+            metalness={0.42}
+            roughness={0.3}
+          />
+        </mesh>
+
+        <mesh position={[-1.18, 0, 0]} castShadow name="solar-panel-left">
+          <boxGeometry args={[1.25, 0.07, 0.7]} />
+          <meshStandardMaterial
+            color={active ? '#176fa8' : '#123e72'}
+            emissive={active ? '#0a5d91' : '#03172d'}
+            emissiveIntensity={active ? 0.4 : 0.18}
+            metalness={0.42}
+            roughness={0.3}
+          />
+        </mesh>
+
+        {/* Slim silver booms connect panels to the bus. */}
+        <mesh position={[0.72, 0, 0]}>
+          <boxGeometry args={[0.42, 0.05, 0.08]} />
+          <meshStandardMaterial color="#9aa8b6" metalness={0.8} roughness={0.25} />
+        </mesh>
+        <mesh position={[-0.72, 0, 0]}>
+          <boxGeometry args={[0.42, 0.05, 0.08]} />
+          <meshStandardMaterial color="#9aa8b6" metalness={0.8} roughness={0.25} />
+        </mesh>
       </group>
 
-      {/* Solar panel -Y wing */}
-      <group position={[0, 0, 0]} name="solar-wing-negative-y">
-        <mesh
-          geometry={useMemo(() => new THREE.BoxGeometry(0.1, 3.5, 2.0), [])}
-          material={useMemo(() => new THREE.MeshStandardMaterial({
-            color: 0x1a1a2e,
-            emissive: highlighted || pinned ? '#0a2a4a' : '#000',
-            emissiveIntensity: highlighted || pinned ? 0.3 : 0.1,
-            metalness: 0.5,
-            roughness: 0.2,
-          }), [highlighted, pinned])}
-          castShadow
-          receiveShadow
-          position={[0, -2.0, 0]}
-          name="solar-panel-minus-y"
-        />
-        <mesh
-          geometry={useMemo(() => new THREE.BoxGeometry(0.12, 3.5, 0.15), [])}
-          material={useMemo(() => new THREE.MeshBasicMaterial({ color: 0x0a0a1a }), [])}
-          position={[0, -2.0, 0.9]}
-        />
-        <mesh
-          geometry={useMemo(() => new THREE.BoxGeometry(0.12, 3.5, 0.15), [])}
-          material={useMemo(() => new THREE.MeshBasicMaterial({ color: 0x0a0a1a }), [])}
-          position={[0, -2.0, -0.9]}
-        />
+      {/* Small communications antenna. */}
+      <group position={[0.15, 0.42, 0]} name="antenna">
+        <mesh position={[0, 0.22, 0]}>
+          <cylinderGeometry args={[0.025, 0.025, 0.42, 8]} />
+          <meshStandardMaterial color="#aeb8c2" metalness={0.8} roughness={0.25} />
+        </mesh>
+        <mesh position={[0, 0.48, 0]} rotation={[0, 0, Math.PI]}>
+          <coneGeometry args={[0.18, 0.16, 20]} />
+          <meshStandardMaterial color="#d6dde5" metalness={0.75} roughness={0.22} />
+        </mesh>
       </group>
 
-      {/* Antenna/dish */}
-      <group position={[0.7, 0, 0.2]} name="antenna">
-        <mesh
-          geometry={useMemo(() => new THREE.CylinderGeometry(0.04, 0.04, 0.6, 8), [])}
-          material={useMemo(() => new THREE.MeshStandardMaterial({
-            color: 0x555566,
-            metalness: 0.8,
-            roughness: 0.2,
-          }), [])}
-          position={[0.3, 0, 0]}
-          rotation={[0, 0, Math.PI / 2]}
-          name="antenna-boom"
-        />
-        <mesh
-          geometry={useMemo(() => new THREE.ConeGeometry(0.35, 0.4, 16), [])}
-          material={useMemo(() => new THREE.MeshStandardMaterial({
-            color: 0x888899,
-            metalness: 0.9,
-            roughness: 0.1,
-          }), [])}
-          position={[0.6, 0, 0]}
-          rotation={[0, 0, Math.PI / 2]}
-          name="antenna-dish"
-        />
-      </group>
-
-      {/* Cyan accent glow when highlighted/pinned */}
-      {(highlighted || pinned) && (
+      {/* Selection glow is visual emphasis only, never trajectory data. */}
+      {active && (
         <mesh name="satellite-glow">
-          <sphereGeometry args={[1.5, 16, 16]} />
+          <sphereGeometry args={[1.75, 20, 20]} />
           <meshBasicMaterial
             color="#33b1ff"
             transparent
-            opacity={0.12}
+            opacity={0.1}
             depthWrite={false}
             side={THREE.BackSide}
           />

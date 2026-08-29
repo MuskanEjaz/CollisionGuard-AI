@@ -122,12 +122,28 @@ export function TrajectoryControls({
 
   const focusTCA = useCallback((protectedPos, threatPos) => {
     if (!protectedPos || !threatPos) return
+
     const midpoint = new THREE.Vector3(
       (protectedPos[0] + threatPos[0]) / 2,
       (protectedPos[1] + threatPos[1]) / 2,
       (protectedPos[2] + threatPos[2]) / 2
     ).multiplyScalar(VISUAL_SCALE)
-    const pos = midpoint.clone().multiplyScalar(3)  // Close zoom
+
+    // Position the camera near the conjunction midpoint.
+    // Earth remains contextual rather than dominating the local view.
+    const radial = midpoint.clone().normalize()
+    const referenceUp = Math.abs(radial.y) > 0.92
+      ? new THREE.Vector3(1, 0, 0)
+      : new THREE.Vector3(0, 1, 0)
+
+    const side = new THREE.Vector3()
+      .crossVectors(radial, referenceUp)
+      .normalize()
+
+    const pos = midpoint.clone()
+      .add(radial.multiplyScalar(2.8))
+      .add(side.multiplyScalar(1.15))
+
     transitionTo(pos, midpoint, 800)
   }, [transitionTo])
 

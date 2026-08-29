@@ -24,5 +24,9 @@
     "cross_section_m2": 0.3
   },
   "predicted_miss_distance_km": null,
-  "time_to_closest_approach_s": null
+  "time_to_closest_approach_s": null,
+  "data_source": "Committed synthetic LEO demo scenario",
+  "data_quality": "Demonstration data",
+  "uncertainty_basis": "Synthetic covariance",
+  "operational_use": "Simulation only — not operational tracking data"
 }

@@ -87,6 +87,15 @@ class Scenario(BaseModel):
     scenario_type: ScenarioType
     description: str = Field(..., min_length=1)
     epoch_utc: datetime
+
+    # Data provenance and uncertainty disclosure.
+    # Optional at contract level for backwards compatibility with runtime
+    # scenarios, but committed demo scenarios provide all four values.
+    data_source: str | None = None
+    data_quality: str | None = None
+    uncertainty_basis: str | None = None
+    operational_use: str | None = None
+
     our_satellite: SpaceObject
     threat_object: SpaceObject
 
