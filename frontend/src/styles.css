@@ -986,3 +986,25 @@ body {
     min-height: 440px;
   }
 }
+
+/* SIZE-DISCLOSURE-LAYOUT-FIX */
+.size-disclosure {
+  position: absolute;
+  left: 14px;
+  right: auto;
+  top: auto;
+  bottom: 12px;
+  z-index: 6;
+  max-width: calc(100% - 28px);
+  padding: 6px 10px;
+  border: 1px solid rgba(105, 154, 196, 0.28);
+  border-radius: 5px;
+  background: rgba(5, 18, 32, 0.88);
+  color: var(--tx-mid);
+  font-size: 10px;
+  line-height: 1.35;
+  letter-spacing: 0.02em;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+}
+/* END-SIZE-DISCLOSURE-LAYOUT-FIX */
