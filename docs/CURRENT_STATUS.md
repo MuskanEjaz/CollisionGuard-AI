@@ -8,19 +8,37 @@
 ## Completed and verified
 
 | Item | Evidence |
-|---|---|
-| FastAPI backend, all routes | 140 fast tests passed in Phase 8 verification session (452.95 s) |
-| Pydantic v2 schemas | Validated by test suite and import checks |
-| SGP4 propagation (TEME frame) | 11 propagation tests passed |
-| Brent TCA search (24-hour, tol=0.01 s) | Tested in test_propagation.py |
-| Maneuver safety evaluation (5 candidates) | 13 evaluator tests passed |
-| Granite numeric grounding guardrail | 42 Granite tests passed; live Granite verified in dashboard |
-| Deterministic fallback ranking | Tested in test_granite.py |
-| In-memory TTL cache (SHA-256 key, 300 s) | 6 cache tests passed |
-| Human approval gate (two-step, server-side) | 10 approval/execution tests passed |
-| Simulated execution + incident report | 5 incident report tests passed |
-| React/Vite dark mission-control dashboard | npm run build succeeded — 1m 16s, Plotly chunk warning only |
-| CORS DELETE fix applied to main.py | 6 CORS preflight tests executed: 6 passed in 1.51 s |
+| Item                                        | Evidence                                                         |
+
+| ------------------------------------------- | ---------------------------------------------------------------- |
+
+| FastAPI backend, all routes                 | 140 fast tests passed in Phase 8 verification session (452.95 s) |
+
+| Pydantic v2 schemas                         | Validated by test suite and import checks                        |
+
+| SGP4 propagation (TEME frame)               | 11 propagation tests passed                                      |
+
+| Brent TCA search (24-hour, tol=0.01 s)      | Tested in test_propagation.py                                    |
+
+| Maneuver safety evaluation (5 candidates)   | 13 evaluator tests passed                                        |
+
+| Granite numeric grounding guardrail         | 42 Granite tests passed (mocked)                                 |
+
+| Deterministic fallback ranking              | Tested in test_granite.py                                        |
+
+| In-memory TTL cache (SHA-256 key, 300 s)    | 6 cache tests passed                                             |
+
+| Human approval gate (two-step, server-side) | 10 approval/execution tests passed                               |
+
+| Simulated execution + incident report       | 5 incident report tests passed                                   |
+
+| React/Vite dark mission-control dashboard   | npm run build succeeded — 1m 16s, Plotly chunk warning only      |
+
+| CORS DELETE fix applied to main.py          | 6 CORS preflight tests executed: 6 passed in 1.51 s              |
+
+| README.md condensed (Phase 8 verification)  | 832 lines → 439 lines; all required content preserved            |
+
+| docs/ directory created (Phase 8)           | 10 documentation files created                                   |
 | README.md condensed (Phase 8 verification) | 832 lines → 439 lines; all required content preserved |
 | docs/ directory created (Phase 8) | 10 documentation files created |
 
@@ -28,17 +46,35 @@
 
 ## Completed with mocked tests
 
-| Item | Status |
-|---|---|
-| IBM Granite live API call | 42 automated tests use mocked responses; live API separately verified |
-| Granite prompt construction | Implemented; never sent to real Granite in tests |
-| Granite response parsing | Implemented and unit-tested with synthetic JSON |
-| Granite incident report generation | Implemented; mocked in tests |
-| Granite numeric conflict detection | Implemented; tested with synthetic discrepancies |
 
-All 42 Granite automated tests pass. These tests use mocked/synthetic
-responses for deterministic coverage. Live watsonx verification is documented
-separately below.
+
+| Item                            | Notes                                                                  |
+
+| ------------------------------------------- | --------------------------------------------- | ----------------------------------- |
+
+| Real 1,000-trial Monte Carlo | `pytest tests/test_monte_carlo.py -v -m slow` | ~8 min; must run before submission  |
+
+| Live Granite smoke test      | `python granite_smoke_test.py`                | Requires .env with real credentials |
+
+
+
+Neither of these tests may be labelled "passed" without actual execution.
+
+
+
+## Partially implemented
+
+
+
+| Item                            | Notes                                                                  |
+
+| ------------------------------- | ---------------------------------------------------------------------- |
+
+| 3D trajectory visualisation     | Circular orbit approximation only; labelled "SIMPLIFIED FOR PROTOTYPE" |
+
+| TrajectoryPlot orbital elements | Hardcoded approximate values; not derived from TLE parse               |
+
+
 
 ---
 
@@ -87,7 +123,7 @@ The remaining deferred test may not be labelled "passed" without actual executio
 
 | Item | Owner | Notes |
 |---|---|---|
-| Demo video recording | Surya | Script ready in docs/DEMO_VIDEO_PLAN.md |
+| Demo video recording | Suryansh | Script ready in docs/DEMO_VIDEO_PLAN.md |
 | GitHub repository description and topics | Muskan | Post-submission task |
 | Challenge submission form | Muskan | Pending final video URL |
 
@@ -151,7 +187,7 @@ Evidence:
 
 The test exists as `test_monte_carlo_real_1000_trials` in `test_monte_carlo.py`
 and is decorated `@pytest.mark.slow`. It has never been run in this session.
-Surya owns this execution task.
+Suryansh owns this execution task.
 
 ---
 
@@ -171,7 +207,7 @@ Surya owns this execution task.
 - `docs/TEAM_HANDOFF.md` — complete; equal 8.5/10 difficulty assignments
 - `docs/SUBMISSION_COPY.md` — complete; all placeholders clearly marked
 - `docs/CURRENT_STATUS.md` — this file
-- `docs/DEMO_VIDEO_PLAN.md` — complete; full 3-minute script for Surya
+- `docs/DEMO_VIDEO_PLAN.md` — complete; full 3-minute script for Suryansh
 
 ---
 
@@ -179,7 +215,7 @@ Surya owns this execution task.
 
 **Not recorded.**
 
-Script is in `docs/DEMO_VIDEO_PLAN.md`. Surya will record after:
+Script is in `docs/DEMO_VIDEO_PLAN.md`. Suryansh will record after:
 1. Real 1,000-trial Monte Carlo is verified
 2. Pushkar confirms live Granite availability (or records fallback path)
 3. All branches are merged to `main`
@@ -190,14 +226,14 @@ Script is in `docs/DEMO_VIDEO_PLAN.md`. Surya will record after:
 
 ### Competition-critical blockers (in order)
 
-1. ~~**Surya**: Run `pytest tests/ -v -m "not slow"` — **DONE**: 140 passed, 452.95 s~~
-2. **Surya**: Run `pytest tests/test_monte_carlo.py -v -m slow` — confirm
+1. ~~**Suryansh**: Run `pytest tests/ -v -m "not slow"` — **DONE**: 140 passed, 452.95 s~~
+2. **Suryansh**: Run `pytest tests/test_monte_carlo.py -v -m slow` — confirm
    `n_trials=1000`, take screenshot
 3. ~~**Pushkar**: Obtain watsonx credentials, run smoke test, verify live Granite
    in dashboard, provide evidence screenshots~~ — **DONE**
 4. **Muskan**: Verify UI end-to-end with both scenarios, confirm all cards render,
    take evidence screenshots
-5. **Surya**: Record demo video against final merged build, upload publicly
+5. **Suryansh**: Record demo video against final merged build, upload publicly
 6. **Muskan**: Update README with final test counts and video URL
 7. **Muskan**: Complete challenge submission form
 

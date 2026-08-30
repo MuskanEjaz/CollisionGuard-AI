@@ -1,14 +1,63 @@
+# Environment / Secrets
 .env
 .env.*
 !.env.example
+
+# Node
 node_modules/
-venv/
-.venv/
-__pycache__/
-*.pyc
-.DS_Store
-.vscode/
-.idea/
 dist/
 build/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+
+# Virtual environments
+venv/
+.venv/
+
+# Testing / Coverage
+.coverage
 coverage/
+.pytest_cache/
+htmlcov/
+
+# IDE / Editor
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Generated / temporary project artifacts
+analysis.txt
+approval_analysis.txt
+furtherplan.txt
+claude-progress.txt
+surya-final-verification.txt
+measure_perf.py
+performance.txt
+performance-results.txt
+
+#claude
+.claude/
+# Claude / temporary verification artifacts
+analysis.txt
+approval_analysis.txt
+claude-progress.txt
+furtherplan.txt
+surya-final-verification.txt
+
+# Performance measurement artifacts
+measure_perf.py
+performance-results.txt
+performance.txt
+
+# Temporary test verification outputs
+cache_ttl_test*.txt
+safety_reval_test*.txt
+
+# Temporary test backup
+test_phase7.py.backup
