@@ -1,5 +1,9 @@
 # CollisionGuard AI
 
+<p align="center">
+  <img src="assets/collisionguard-dashboard.png" alt="CollisionGuard AI Dashboard" width="100%">
+</p>
+
 > **Autonomous Screening, Deterministic Safety, Human Authority:** An AI-powered Low Earth Orbit (LEO) conjunction decision-support system that provides satellite operators with physics-grounded collision risk assessment, candidate maneuver evaluation, IBM Granite advisory insights, and human-in-the-loop safety gates.
 
 ---
