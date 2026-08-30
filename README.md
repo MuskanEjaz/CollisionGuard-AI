@@ -4,9 +4,17 @@
   <img src="assets/collisionguard-dashboard.png" alt="CollisionGuard AI Dashboard" width="100%">
 </p>
 
-### Demo Video
+<h2 align="center">🎥 CollisionGuard AI — Demo Video</h2>
 
-[Watch the CollisionGuard AI Demo](VIDEO_LINK_COMING_SOON)
+<p align="center">
+  <a href="#">
+    <img src="https://img.shields.io/badge/▶%20WATCH%20DEMO%20VIDEO-COMING%20SOON-1677FF?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Demo Video">
+  </a>
+</p>
+
+<p align="center">
+  <i>See how CollisionGuard AI transforms orbital data into safer, explainable decisions.</i>
+</p>
 
 > **Autonomous Screening, Deterministic Safety, Human Authority:** An AI-powered Low Earth Orbit (LEO) conjunction decision-support system that provides satellite operators with physics-grounded collision risk assessment, candidate maneuver evaluation, IBM Granite advisory insights, and human-in-the-loop safety gates.
 
