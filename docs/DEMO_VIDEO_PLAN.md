@@ -1,6 +1,6 @@
 # Demo Video Plan — CollisionGuard AI
 
-> This document is Surya's production plan for the required demo video.
+> This document is Suryansh's production plan for the required demo video.
 > Maximum duration: 3 minutes (180 seconds).
 > Recommended filename: CollisionGuard_AI_Demo.mp4
 > Do not record until all branches are merged to main.
@@ -250,7 +250,7 @@ Read these from the actual screen — do not pre-script specific values:
 
 ---
 
-## Statements Surya must NOT make
+## Statements Suryansh must NOT make
 
 These statements are prohibited in the video narration:
 
