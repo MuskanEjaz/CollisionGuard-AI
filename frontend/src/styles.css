@@ -828,6 +828,7 @@ body {
 .traj-kbd-clear:hover { color:var(--red); border-color:var(--red-bdr); }
 
 /* TCA local-view notice */
+.local-view-notice,
 .traj-tca-notice {
   position:absolute; bottom:var(--s3); left:50%; transform:translateX(-50%);
   z-index:20;

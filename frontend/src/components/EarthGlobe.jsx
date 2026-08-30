@@ -61,144 +61,60 @@ export function EarthGlobe({
   // Base sphere with procedural coloring
   const earthGeometry = useMemo(() => new THREE.SphereGeometry(EARTH_RADIUS_VISUAL, 64, 64), [])
 
+  const textures = useMemo(() => {
+    const loader = new THREE.TextureLoader()
+    return {
+      day: loader.load('/assets/earth/earth_daymap.jpg'),
+      night: loader.load('/assets/earth/earth_nightmap.jpg'),
+      clouds: loader.load('/assets/earth/earth_clouds.jpg'),
+      normal: loader.load('/assets/earth/earth_normal_map.jpg'),
+    }
+  }, [])
+
   // We create a custom material that simulates Earth appearance
   const earthMaterial = useMemo(() => {
-    // Create a canvas texture for procedural Earth
-    const canvas = document.createElement('canvas')
-    canvas.width = 1024
-    canvas.height = 512
-    const ctx = canvas.getContext('2d')
-
-    // Base ocean color
-    const oceanGradient = ctx.createLinearGradient(0, 0, 0, 512)
-    oceanGradient.addColorStop(0, '#0a1f3a')
-    oceanGradient.addColorStop(0.5, '#0d2e5a')
-    oceanGradient.addColorStop(1, '#0a1f3a')
-    ctx.fillStyle = oceanGradient
-    ctx.fillRect(0, 0, 1024, 512)
-
-    // Add land masses (procedural approximation)
-    // Using noise-like patterns for continents
-    const landColors = ['#1a4a2e', '#2a5a3e', '#1a3a2e', '#2d4a2a', '#3a5a2a']
-    for (let i = 0; i < 2000; i++) {
-      const x = Math.random() * 1024
-      const y = Math.random() * 512
-      const r = Math.random() * 30 + 5
-      ctx.beginPath()
-      ctx.arc(x, y, r, 0, Math.PI * 2)
-      ctx.fillStyle = landColors[Math.floor(Math.random() * landColors.length)]
-      ctx.globalAlpha = 0.3 + Math.random() * 0.4
-      ctx.fill()
-      ctx.globalAlpha = 1
-    }
-
-    // Add some larger land masses (rough continental shapes)
-    const continents = [
-      { x: 150, y: 150, w: 200, h: 300, color: '#2a5a3a' },  // Americas-ish
-      { x: 500, y: 100, w: 300, h: 250, color: '#2d5a2d' },  // Africa/Eurasia-ish
-      { x: 800, y: 200, w: 150, h: 200, color: '#1a4a2a' },  // Australia-ish
-      { x: 300, y: 350, w: 180, h: 100, color: '#2a4a3a' },  // Antarctica-ish
-    ]
-    continents.forEach(c => {
-      const gradient = ctx.createRadialGradient(c.x + c.w/2, c.y + c.h/2, 0, c.x + c.w/2, c.y + c.h/2, Math.max(c.w, c.h)/2)
-      gradient.addColorStop(0, c.color)
-      gradient.addColorStop(1, '#0a1f3a')
-      ctx.fillStyle = gradient
-      ctx.beginPath()
-      ctx.ellipse(c.x + c.w/2, c.y + c.h/2, c.w/2, c.h/2, 0, 0, Math.PI * 2)
-      ctx.fill()
-    })
-
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.wrapS = THREE.RepeatWrapping
-    texture.wrapT = THREE.RepeatWrapping
-
     return new THREE.MeshStandardMaterial({
-      map: texture,
-      roughness: 0.8,
+      map: textures.day,
+      normalMap: textures.normal,
+      roughness: 0.6,
       metalness: 0.05,
     })
-  }, [])
+  }, [textures])
 
   // Cloud layer
   const cloudGeometry = useMemo(() => new THREE.SphereGeometry(EARTH_RADIUS_VISUAL * 1.005, 64, 64), [])
   const cloudMaterial = useMemo(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 512
-    canvas.height = 256
-    const ctx = canvas.getContext('2d')
-    ctx.fillStyle = 'rgba(255,255,255,0)'
-    ctx.fillRect(0, 0, 512, 256)
-
-    // Procedural clouds
-    for (let i = 0; i < 500; i++) {
-      const x = Math.random() * 512
-      const y = Math.random() * 256
-      const r = Math.random() * 40 + 10
-      const gradient = ctx.createRadialGradient(x, y, 0, x, y, r)
-      gradient.addColorStop(0, 'rgba(255,255,255,0.4)')
-      gradient.addColorStop(1, 'rgba(255,255,255,0)')
-      ctx.fillStyle = gradient
-      ctx.beginPath()
-      ctx.arc(x, y, r, 0, Math.PI * 2)
-      ctx.fill()
-    }
-
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.wrapS = THREE.RepeatWrapping
-    texture.wrapT = THREE.RepeatWrapping
-    texture.opacity = 0.4
-
     return new THREE.MeshStandardMaterial({
-      map: texture,
+      map: textures.clouds,
       transparent: true,
       opacity: 0.35,
+      blending: THREE.AdditiveBlending,
       depthWrite: false,
       side: THREE.DoubleSide,
     })
-  }, [])
+  }, [textures])
 
   // Atmosphere rim (thin blue glow at limb)
   const atmosphereGeometry = useMemo(() => new THREE.SphereGeometry(EARTH_RADIUS_VISUAL * 1.02, 64, 64), [])
   const atmosphereMaterial = useMemo(() => new THREE.MeshBasicMaterial({
-    color: 0x3a7bd5,
+    color: 0x33b1ff,
     transparent: true,
-    opacity: 0.08,
+    opacity: 0.22,
+    blending: THREE.AdditiveBlending,
     side: THREE.BackSide,
     depthWrite: false,
   }), [])
 
   // Night lights (emissive map for dark side)
   const nightLightsMaterial = useMemo(() => {
-    const canvas = document.createElement('canvas')
-    canvas.width = 1024
-    canvas.height = 512
-    const ctx = canvas.getContext('2d')
-    ctx.fillStyle = '#000'
-    ctx.fillRect(0, 0, 1024, 512)
-
-    // Add city lights (tiny bright dots on land areas)
-    for (let i = 0; i < 2000; i++) {
-      const x = Math.random() * 1024
-      const y = Math.random() * 512
-      // Only add lights on "land" areas (avoid oceans)
-      if (Math.random() > 0.7) {
-        ctx.fillStyle = `rgba(255,220,180,${Math.random() * 0.8 + 0.2})`
-        ctx.fillRect(x, y, 1, 1)
-      }
-    }
-
-    const texture = new THREE.CanvasTexture(canvas)
-    texture.wrapS = THREE.RepeatWrapping
-    texture.wrapT = THREE.RepeatWrapping
-
     return new THREE.MeshBasicMaterial({
-      map: texture,
+      map: textures.night,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.7,
+      blending: THREE.AdditiveBlending,
       depthWrite: false,
     })
-  }, [])
+  }, [textures])
 
   return (
     <group>

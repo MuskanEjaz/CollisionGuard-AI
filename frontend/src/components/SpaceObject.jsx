@@ -60,10 +60,10 @@ export function ProtectedSatellite({
       <mesh castShadow receiveShadow name="satellite-bus">
         <boxGeometry args={[1.05, 0.72, 0.82]} />
         <meshStandardMaterial
-          color={active ? '#7fdbff' : '#b8c7d9'}
-          emissive={active ? '#0d6b9c' : '#08283a'}
-          emissiveIntensity={active ? 0.55 : 0.2}
-          metalness={0.72}
+          color={active ? '#90d5ff' : '#d0dce8'}
+          emissive={active ? '#0d6b9c' : '#142a40'}
+          emissiveIntensity={active ? 0.6 : 0.25}
+          metalness={0.82}
           roughness={0.3}
         />
       </mesh>
@@ -85,10 +85,10 @@ export function ProtectedSatellite({
         <mesh position={[1.18, 0, 0]} castShadow name="solar-panel-right">
           <boxGeometry args={[1.25, 0.07, 0.7]} />
           <meshStandardMaterial
-            color={active ? '#176fa8' : '#123e72'}
-            emissive={active ? '#0a5d91' : '#03172d'}
-            emissiveIntensity={active ? 0.4 : 0.18}
-            metalness={0.42}
+            color={active ? '#1c66b8' : '#0f3875'}
+            emissive={active ? '#0a4278' : '#041738'}
+            emissiveIntensity={active ? 0.45 : 0.2}
+            metalness={0.5}
             roughness={0.3}
           />
         </mesh>
@@ -96,10 +96,10 @@ export function ProtectedSatellite({
         <mesh position={[-1.18, 0, 0]} castShadow name="solar-panel-left">
           <boxGeometry args={[1.25, 0.07, 0.7]} />
           <meshStandardMaterial
-            color={active ? '#176fa8' : '#123e72'}
-            emissive={active ? '#0a5d91' : '#03172d'}
-            emissiveIntensity={active ? 0.4 : 0.18}
-            metalness={0.42}
+            color={active ? '#1c66b8' : '#0f3875'}
+            emissive={active ? '#0a4278' : '#041738'}
+            emissiveIntensity={active ? 0.45 : 0.2}
+            metalness={0.5}
             roughness={0.3}
           />
         </mesh>
@@ -127,19 +127,23 @@ export function ProtectedSatellite({
         </mesh>
       </group>
 
-      {/* Selection glow is visual emphasis only, never trajectory data. */}
-      {active && (
-        <mesh name="satellite-glow">
-          <sphereGeometry args={[1.75, 20, 20]} />
-          <meshBasicMaterial
-            color="#33b1ff"
-            transparent
-            opacity={0.1}
-            depthWrite={false}
-            side={THREE.BackSide}
-          />
-        </mesh>
-      )}
+      {/* Central bright cyan beacon light */}
+      <mesh name="satellite-beacon">
+        <sphereGeometry args={[0.15, 16, 16]} />
+        <meshBasicMaterial color="#00e5ff" />
+      </mesh>
+
+      {/* Visible blue glow aura */}
+      <mesh name="satellite-glow">
+        <sphereGeometry args={[1.85, 24, 24]} />
+        <meshBasicMaterial
+          color="#33b1ff"
+          transparent
+          opacity={active ? 0.35 : 0.22}
+          depthWrite={false}
+          side={THREE.BackSide}
+        />
+      </mesh>
     </group>
   )
 }
@@ -165,8 +169,8 @@ export function ThreatObject({
     }
   })
 
-  const baseColor = highlighted || pinned ? '#fa4d56' : '#aa3338'
-  const emissiveColor = highlighted || pinned ? '#fa4d56' : '#441111'
+  const baseColor = highlighted || pinned ? '#fa4d56' : '#3a3f4a'
+  const emissiveColor = highlighted || pinned ? '#fa4d56' : '#221414'
   const emissiveIntensity = highlighted || pinned ? 0.4 : 0.15
 
   // Generate irregular debris shape (same seed for consistency)
@@ -214,8 +218,8 @@ export function ThreatObject({
           color: baseColor,
           emissive: emissiveColor,
           emissiveIntensity,
-          metalness: 0.6,
-          roughness: 0.5,
+          metalness: 0.8,
+          roughness: 0.4,
           flatShading: true,
         }), [baseColor, emissiveColor, emissiveIntensity])}
         castShadow
@@ -223,19 +227,23 @@ export function ThreatObject({
         name="debris-body"
       />
 
-      {/* Red accent glow when highlighted/pinned */}
-      {(highlighted || pinned) && (
-        <mesh name="debris-glow">
-          <sphereGeometry args={[2.0, 16, 16]} />
-          <meshBasicMaterial
-            color="#fa4d56"
-            transparent
-            opacity={0.12}
-            depthWrite={false}
-            side={THREE.BackSide}
-          />
-        </mesh>
-      )}
+      {/* Central glowing red hazard hotspot */}
+      <mesh name="debris-core">
+        <sphereGeometry args={[0.14, 16, 16]} />
+        <meshBasicMaterial color="#ff3b30" />
+      </mesh>
+
+      {/* Visible red danger glow aura */}
+      <mesh name="debris-glow">
+        <sphereGeometry args={[2.0, 24, 24]} />
+        <meshBasicMaterial
+          color="#fa4d56"
+          transparent
+          opacity={highlighted || pinned ? 0.35 : 0.22}
+          depthWrite={false}
+          side={THREE.BackSide}
+        />
+      </mesh>
     </group>
   )
 }
