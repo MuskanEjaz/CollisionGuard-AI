@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://youtu.be/VqeQxbSCIq0">
-    <img src="https://img.shields.io/badge/▶%20WATCH%20DEMO%20VIDEO-COMING%20SOON-1677FF?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Demo Video">
+    <img src="https://img.shields.io/badge/▶%20WATCH%20DEMO%20VIDEO-PLAY%20NOW-1677FF?style=for-the-badge&logo=youtube&logoColor=white" alt="Watch Demo Video">
   </a>
 </p>
 
